@@ -16,7 +16,7 @@
 | No. | Student ID | Full Name | GitHub Username |
 | :-: | :-: | :--- | :--- |
 | 1 | 27-4135-2022 | AGUILAR ASCENCIO DAVID ALEXIS | `@DavidAlexis28` |
-| 2 | 25-2531-2022 | AMAYA HERNANDEZ ANGEL OTONIEL | `?` |
+| 2 | 25-2531-2022 | AMAYA HERNANDEZ ANGEL OTONIEL | `Otoniel34` |
 | 3 | 25-0574-2024 | LARA LOPEZ CESAR GONZALO | `@cesarlaralopezlaralopez-prog` |
 | 4 | 17-0613-2024 | MENJIVAR CHAVEZ RICARDO FABIO | `@Fabio-Menjivar` |
 | 5 | 25-4222-2024 | MIRANDA GUZMAN ERICK ARMANDO | `@erickmiranda2703-maker` |
