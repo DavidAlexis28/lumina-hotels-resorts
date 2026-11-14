@@ -37,3 +37,12 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Firebase ###
+firebase-service-account.json
+
+# Variables de entorno y credenciales
+.env
+.env.*
+*.pem
+*.key

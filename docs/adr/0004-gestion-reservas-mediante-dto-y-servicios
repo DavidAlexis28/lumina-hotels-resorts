@@ -1,0 +1,59 @@
+ADR-0004: Gestión de reservas mediante DTO y servicios
+
+Proyecto: Lumina Hotels & Resorts
+Estado: Propuesto
+Fecha: 14 de noviembre de 2026
+
+1. Contexto
+
+El sistema Lumina Hotels & Resorts necesita gestionar las solicitudes de reservas de habitaciones de manera organizada. Para ello, se requiere separar la recepción y transferencia de datos de las operaciones y reglas del negocio.
+
+2. Decisión
+
+Se propone utilizar objetos DTO (Data Transfer Object) para transportar los datos de las reservas y una capa de servicios para procesar la lógica correspondiente.
+
+La implementación contempla los siguientes archivos:
+
+- ReservaRequestDTO.java: recibe y organiza los datos enviados para solicitar una reserva.
+- ReservaController.java: recibe y gestiona las solicitudes relacionadas con las reservas.
+- ReservaService.java: procesa las operaciones y reglas del negocio.
+- ReservaRepository.java: permite realizar las operaciones de acceso y consulta a los datos.
+- Reserva.java: representa la información de una reserva dentro del sistema.
+
+3. Justificación
+
+La utilización de DTO y servicios permite separar las responsabilidades, mantener organizado el código y facilitar el mantenimiento del sistema. También evita que el controlador tenga que encargarse directamente de toda la lógica de las reservas y permite controlar mejor el intercambio de información.
+
+4. Consecuencias
+
+Positivas:
+
+- Mejor organización del proceso de reservas.
+- Separación entre recepción de datos y lógica del negocio.
+- Facilita las pruebas y el mantenimiento.
+- Permite ampliar las funcionalidades del sistema.
+
+Desventajas:
+
+- Requiere crear clases adicionales.
+- Es necesario mantener la comunicación entre las diferentes capas.
+- Se debe validar correctamente la información recibida mediante los DTO.
+
+5. Alternativas consideradas
+
+- Procesar todas las reservas directamente desde el controlador.
+- Enviar los datos utilizando directamente las entidades del modelo.
+
+Se propone utilizar DTO y servicios porque permiten una mejor separación de responsabilidades y facilitan el crecimiento del sistema.
+
+6. Referencia de implementación
+
+Paquete principal: "com.lumina.backend"
+
+Archivos relacionados:
+
+- "controllers/ReservaController.java"
+- "dto/ReservaRequestDTO.java"
+- "services/ReservaService.java"
+- "repositories/ReservaRepository.java"
+- "models/Reserva.java"

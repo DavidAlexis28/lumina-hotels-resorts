@@ -1,0 +1,71 @@
+ADR-0007: Estrategia de pruebas del backend
+
+Proyecto: Lumina Hotels & Resorts
+Estado: Propuesto
+Fecha: 14 de noviembre de 2026
+
+1. Contexto
+
+El backend de Lumina Hotels & Resorts necesita contar con pruebas que permitan verificar el funcionamiento de sus componentes, detectar errores y comprobar que las operaciones relacionadas con las reservas se ejecuten correctamente.
+
+2. Decisión
+
+Se propone utilizar JUnit 5 como herramienta principal para realizar pruebas unitarias y comprobar el comportamiento de las diferentes capas del backend.
+
+Las pruebas estarán enfocadas principalmente en:
+
+- Validación de solicitudes de reserva.
+- Funcionamiento de los servicios.
+- Procesamiento de las operaciones de reservas.
+- Acceso y consulta de datos.
+- Manejo de errores y excepciones.
+
+3. Implementación propuesta
+
+Se consideran los siguientes elementos:
+
+- JUnit 5: permite desarrollar y ejecutar pruebas unitarias.
+- ReservaService.java: se realizarán pruebas sobre la lógica del negocio.
+- ReservaController.java: se comprobará el procesamiento de las solicitudes.
+- ReservaRepository.java: se verificarán las operaciones de acceso a los datos.
+- ReservaRequestDTO.java: se comprobará la validación de los datos recibidos.
+
+Las pruebas se organizarán dentro de "src/test/java", siguiendo la estructura de paquetes del proyecto.
+
+4. Justificación
+
+Se propone utilizar JUnit 5 porque permite comprobar el funcionamiento de los componentes de manera organizada, identificar errores durante el desarrollo y mejorar la calidad del código antes de integrar los cambios al proyecto principal.
+
+5. Consecuencias
+
+Positivas:
+
+- Permite detectar errores oportunamente.
+- Mejora la confiabilidad del backend.
+- Facilita el mantenimiento del código.
+- Ayuda a verificar las funcionalidades del sistema.
+- Favorece la integración de los diferentes componentes.
+
+Desventajas:
+
+- Requiere tiempo adicional para desarrollar las pruebas.
+- Es necesario actualizar las pruebas cuando cambia el código.
+- Algunas pruebas requieren configurar datos y dependencias adicionales.
+
+6. Alternativas consideradas
+
+- Realizar únicamente pruebas manuales.
+- No implementar pruebas automatizadas.
+- Utilizar herramientas diferentes para las pruebas unitarias.
+
+Se propone utilizar JUnit 5 porque facilita la automatización y organización de las pruebas del backend.
+
+7. Referencia de implementación
+
+Paquete principal: "com.lumina.backend"
+
+Ubicación de pruebas: "src/test/java"
+
+Tecnología: Java 21 y JUnit 5.
+
+Archivo de configuración: "pom.xml".

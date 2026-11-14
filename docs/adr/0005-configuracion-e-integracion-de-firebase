@@ -1,0 +1,66 @@
+ADR-0005: Configuración e integración de Firebase
+
+Proyecto: Lumina Hotels & Resorts
+Estado: Aceptado (implementación identificada)
+Fecha: 14 de noviembre de 2026
+
+1. Contexto
+
+El backend de Lumina Hotels & Resorts requiere integrar Firebase para disponer de sus servicios desde la aplicación Java. Para ello, se necesita establecer una configuración centralizada que permita inicializar Firebase automáticamente al iniciar el componente de configuración.
+
+2. Decisión
+
+Se utiliza Firebase Admin SDK junto con Google Credentials para realizar la inicialización de Firebase mediante una clase independiente llamada "FirebaseConfig.java".
+
+La configuración utiliza el archivo "firebase-service-account.json" para obtener las credenciales de la cuenta de servicio.
+
+3. Implementación
+
+La integración se realiza mediante los siguientes elementos:
+
+- "@Configuration": identifica la clase como configuración de Spring.
+- "@PostConstruct": ejecuta el método de inicialización después de construir el componente.
+- "GoogleCredentials": permite cargar las credenciales de Firebase.
+- "FirebaseOptions": establece las opciones de configuración.
+- "FirebaseApp": inicializa la aplicación Firebase.
+- "getResourceAsStream()": busca el archivo de credenciales dentro de los recursos.
+- "FileInputStream": permite acceder al archivo desde una ubicación externa cuando no se encuentra en los recursos.
+
+También se comprueba que no exista una instancia previa de Firebase antes de inicializarla, evitando duplicar su creación.
+
+4. Justificación
+
+Se eligió esta implementación porque permite centralizar la configuración de Firebase, automatizar su inicialización y mantener separadas las responsabilidades de configuración y lógica del negocio.
+
+5. Consecuencias
+
+Positivas:
+
+- Inicialización automática de Firebase.
+- Configuración centralizada.
+- Reutilización de la instancia de Firebase.
+- Mejor organización del backend.
+
+Desventajas:
+
+- Requiere mantener correctamente las credenciales.
+- La inicialización depende de la disponibilidad del archivo de servicio.
+- Es necesario controlar los errores durante la conexión.
+
+6. Seguridad
+
+El archivo "firebase-service-account.json" contiene credenciales privadas y no debe publicarse en GitHub.
+
+Se recomienda utilizar variables de entorno o un gestor seguro de secretos para administrar las credenciales, especialmente en producción.
+
+También se debe incluir este archivo en ".gitignore" para evitar que se agregue accidentalmente al repositorio.
+
+7. Referencia de implementación
+
+Paquete: "com.lumina.backend.config"
+
+Archivo: "FirebaseConfig.java"
+
+Tecnologías: Java 21, Spring Framework y Firebase Admin SDK.
+
+Archivo de credenciales: "firebase-service-account.json".

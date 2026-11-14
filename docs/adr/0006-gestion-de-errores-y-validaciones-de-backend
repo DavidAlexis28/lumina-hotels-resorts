@@ -1,0 +1,70 @@
+ADR-0006: Gestión de errores y validaciones del backend
+
+Proyecto: Lumina Hotels & Resorts
+Estado: Propuesto
+Fecha: 14 de noviembre de 2026
+
+1. Contexto
+
+El backend de Lumina Hotels & Resorts necesita controlar los errores que pueden presentarse durante el procesamiento de solicitudes y la gestión de reservas. También requiere validar los datos recibidos para evitar información incompleta o incorrecta.
+
+2. Decisión
+
+Se propone implementar mecanismos de validación de datos y gestión de excepciones para mejorar la confiabilidad del sistema.
+
+La solución contempla:
+
+- Validar los campos obligatorios de las solicitudes de reserva.
+- Comprobar que las fechas de entrada y salida sean válidas.
+- Verificar la disponibilidad de habitaciones antes de confirmar una reserva.
+- Controlar errores durante las operaciones de acceso a los datos.
+- Proporcionar respuestas claras cuando ocurra un problema.
+
+3. Implementación propuesta
+
+Se consideran los siguientes elementos:
+
+- ReservaRequestDTO.java: permite validar los datos recibidos para solicitar una reserva.
+- ReservaController.java: recibe las solicitudes y comunica los resultados al usuario.
+- ReservaService.java: aplica las reglas de validación relacionadas con las reservas.
+- ReservaRepository.java: gestiona las operaciones de acceso a los datos.
+- GlobalExceptionHandler.java: se propone para centralizar el manejo de excepciones, si se incorpora a la implementación.
+
+4. Justificación
+
+La gestión de errores y validaciones permitirá reducir problemas durante el procesamiento de reservas, mantener la integridad de la información y facilitar la identificación de fallos en el backend.
+
+5. Consecuencias
+
+Positivas:
+
+- Reduce el ingreso de información incorrecta.
+- Facilita la identificación y el control de errores.
+- Mejora la confiabilidad del sistema.
+- Facilita el mantenimiento del código.
+
+Desventajas:
+
+- Requiere implementar controles adicionales.
+- Aumenta el trabajo de desarrollo y pruebas.
+- Es necesario mantener actualizadas las reglas de validación.
+
+6. Alternativas consideradas
+
+- No implementar validaciones específicas.
+- Gestionar los errores directamente desde cada controlador.
+- Centralizar el manejo de excepciones mediante una clase independiente.
+
+Se propone utilizar validaciones en las diferentes capas y centralizar el manejo de excepciones para mantener una mejor organización.
+
+7. Referencia de implementación
+
+Paquete principal: "com.lumina.backend"
+
+Clases relacionadas:
+
+- "controllers/ReservaController.java"
+- "dto/ReservaRequestDTO.java"
+- "services/ReservaService.java"
+- "repositories/ReservaRepository.java"
+- "GlobalExceptionHandler.java" (propuesto)

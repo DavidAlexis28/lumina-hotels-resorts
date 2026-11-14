@@ -1,0 +1,57 @@
+ADR-0009: Configuración y despliegue del backend
+
+Estado: Propuesto
+Fecha: 14 de noviembre de 2026
+Proyecto: Lumina Hotels & Resorts
+
+1. Contexto
+
+El backend de Lumina Hotels & Resorts está desarrollado en Java 21 y utiliza Maven para la gestión de dependencias y compilación. También requiere conexión con SQL Server y configuración de Firebase.
+
+Es necesario establecer un proceso organizado para preparar, probar y desplegar la aplicación sin exponer información confidencial.
+
+2. Decisión
+
+Se propone utilizar Maven para administrar las dependencias y generar el archivo ejecutable del backend.
+
+La configuración del entorno de ejecución deberá mantenerse separada del código fuente, utilizando variables de entorno para credenciales y datos sensibles.
+
+3. Implementación propuesta
+
+- Mantener Java 21 como versión de desarrollo.
+- Administrar las dependencias desde "pom.xml".
+- Ejecutar las pruebas antes de preparar una versión.
+- Generar el archivo ".jar" mediante Maven cuando la compilación esté configurada correctamente.
+- Configurar las conexiones a SQL Server y Firebase mediante información externa al repositorio.
+- Definir con el equipo el servidor o plataforma donde se desplegará el backend.
+
+4. Justificación
+
+Esta decisión permite mantener un proceso de desarrollo ordenado, facilitar la preparación de nuevas versiones y reducir riesgos relacionados con la exposición de credenciales.
+
+5. Consecuencias
+
+Positivas:
+
+- Facilita la compilación y preparación del proyecto.
+- Mejora la organización de los entornos.
+- Permite realizar futuras actualizaciones de manera controlada.
+
+Pendientes:
+
+- Confirmar que la compilación Maven funciona correctamente.
+- Definir la plataforma de despliegue.
+- Validar las conexiones en el entorno de producción.
+
+6. Alternativas consideradas
+
+- Compilar y ejecutar únicamente desde IntelliJ IDEA.
+- Utilizar herramientas de automatización para compilar y desplegar el proyecto.
+
+Se propone mantener Maven como herramienta principal y evaluar la automatización en una etapa posterior.
+
+7. Referencias
+
+- "pom.xml"
+- "src/main/java/com/lumina/backend/"
+- "src/main/resources/"

@@ -1,0 +1,71 @@
+ADR-0008: Seguridad y protección de la información
+
+Proyecto: Lumina Hotels & Resorts
+Estado: Propuesto
+Fecha: 14 de noviembre de 2026
+
+1. Contexto
+
+El backend de Lumina Hotels & Resorts maneja información relacionada con las reservas, configuraciones del sistema y credenciales necesarias para conectarse con servicios externos como Firebase. Por esta razón, es necesario establecer medidas de seguridad que protejan la información y eviten la exposición de datos sensibles.
+
+2. Decisión
+
+Se propone implementar medidas de seguridad para proteger las credenciales, los archivos de configuración y la información utilizada por el backend.
+
+Las medidas contemplan:
+
+- Evitar publicar contraseñas, claves privadas y credenciales en GitHub.
+- Utilizar archivos de configuración seguros para administrar información sensible.
+- Incorporar archivos privados al ".gitignore".
+- Proteger las credenciales de Firebase Admin SDK.
+- Evitar incluir información personal o sensible en los registros del sistema.
+- Utilizar variables de entorno o gestores de secretos para administrar credenciales en producción.
+
+3. Implementación propuesta
+
+Se consideran los siguientes elementos:
+
+- .gitignore: evita que archivos sensibles sean agregados accidentalmente al repositorio.
+- firebase-service-account.json: contiene credenciales privadas y debe mantenerse fuera del repositorio.
+- Variables de entorno: permiten administrar configuraciones sensibles sin escribirlas directamente en el código.
+- Firebase Admin SDK: permite acceder a los servicios de Firebase mediante credenciales autorizadas.
+- Repositorio GitHub: debe mantenerse libre de contraseñas, claves privadas y datos personales.
+
+4. Justificación
+
+Se propone implementar estas medidas para reducir los riesgos de exposición de información, proteger las credenciales de acceso y mantener la seguridad del backend durante el desarrollo y despliegue.
+
+5. Consecuencias
+
+Positivas:
+
+- Mayor protección de las credenciales.
+- Menor riesgo de exposición de información sensible.
+- Mejor control de los archivos del repositorio.
+- Facilita el cumplimiento de buenas prácticas de seguridad.
+
+Desventajas:
+
+- Requiere mantener correctamente las configuraciones.
+- Es necesario controlar el acceso a las credenciales.
+- La administración de secretos puede requerir herramientas adicionales.
+
+6. Alternativas consideradas
+
+- Almacenar las credenciales directamente en el código fuente.
+- Publicar los archivos de configuración dentro del repositorio.
+- Administrar las credenciales mediante variables de entorno o gestores de secretos.
+
+Se propone utilizar mecanismos seguros de administración de credenciales para evitar su exposición y facilitar el mantenimiento del sistema.
+
+7. Referencia de implementación
+
+Paquete principal: "com.lumina.backend"
+
+Archivos y recursos relacionados:
+
+- ".gitignore"
+- "config/FirebaseConfig.java"
+- "firebase-service-account.json" (archivo privado, excluido del repositorio)
+- Variables de entorno.
+- Repositorio GitHub de Lumina Hotels & Resorts.
