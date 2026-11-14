@@ -1,0 +1,29 @@
+# --- Java / Maven (backend/) ---
+**/target/
+*.class
+*.log
+
+# --- Android / Gradle (mobile/) ---
+**/build/
+.gradle/
+local.properties
+.navigation/
+
+# --- IDEs (IntelliJ IDEA & Android Studio) ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# --- Sistema Operativo ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# --- Credenciales y Archivos Sensibles ---
+.env
+*.pem
+serviceAccountKey.json
+*.jks
+*.keystore
