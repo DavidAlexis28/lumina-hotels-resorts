@@ -1,8 +1,8 @@
-package lumina_backend.services;
+package com.lumina.backend.services;
 
-import lumina_backend.dto.ReservaRequestDTO;
-import lumina_backend.models.Reserva;
-import lumina_backend.repositories.ReservaRepository;
+import com.lumina.backend.dto.ReservaRequestDTO;
+import com.lumina.backend.models.Reserva;
+import com.lumina.backend.repositories.ReservaRepository;
 import org.springframework.stereotype.Service;
 
 @Service
