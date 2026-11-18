@@ -9,7 +9,6 @@
 
 > Formative research and software development project for **Programming 3 (Section 03)**, Faculty of Informatics and Applied Sciences.
 
-----
 
 ## Team Members
 

@@ -1,9 +1,12 @@
 package com.lumina.backend.dto;
 
+import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Data
 public class ReservaRequestDTO {
     private Integer clienteID;
     private Integer habitacionID;
@@ -13,6 +16,7 @@ public class ReservaRequestDTO {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate fechaSalida;
     private Integer cantidadHuespedes;
+    private BigDecimal precioPorNoche;
     private String observaciones;
 
     public ReservaRequestDTO() {
