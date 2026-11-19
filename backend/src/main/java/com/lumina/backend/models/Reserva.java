@@ -14,14 +14,11 @@ public class Reserva {
     private Integer clienteID;
     private Integer habitacionID;
     private Integer usuarioID;
-    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate fechaEntrada;
-    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate fechaSalida;
     private Integer cantidadHuespedes;
     private String estado;
     private BigDecimal precioPorNoche;
-    private BigDecimal costoTotal;
     private String observaciones;
     private LocalDateTime fechaCreacion;
 }
