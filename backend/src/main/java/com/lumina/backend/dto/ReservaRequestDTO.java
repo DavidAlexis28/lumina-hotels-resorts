@@ -1,6 +1,7 @@
 package com.lumina.backend.dto;
 
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
