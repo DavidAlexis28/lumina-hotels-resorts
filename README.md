@@ -123,7 +123,7 @@ LuminaHotels_CRUD_Completo/
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/erickmiranda2703-maker/investigacion-reservas-hotel.git](https://github.com/erickmiranda2703-maker/investigacion-reservas-hotel.git)
+git clone https://github.com/DavidAlexis28/lumina-hotels-resorts.git
 cd investigacion-reservas-hotel
 ```
 
