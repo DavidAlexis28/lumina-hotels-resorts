@@ -1,26 +1,29 @@
-name: CI Backend
+name: Lumina Hotels & Resorts CI
 
 on:
   push:
-    branches: [ dev, main ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ dev, main ]
+    branches: [ main, dev ]
 
 jobs:
-  build:
+  build-backend-and-experiments:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up OpenJDK 21 LTS (Temurin)
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Run Maven Test
-        run: mvn --batch-mode test
+      - name: Compilar y ejecutar pruebas JUnit 5 del Backend
         working-directory: backend
+        run: mvn -B clean test
+
+      - name: Compilar módulo Experimental OLTP
+        working-directory: experiments
+        run: mvn -B clean compile
