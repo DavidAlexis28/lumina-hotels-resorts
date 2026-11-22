@@ -1,319 +1,387 @@
-Lumina Hotels & Resorts
+# 🏨 Lumina Hotels & Resorts
 
-Full-Stack Hospitality, Attraction Booking & Real-Time Inventory Management Platform
+**Plataforma integral Full-Stack para gestión hotelera, reservas de atracciones y administración de inventario en tiempo real.**
 
-Formative research and full-stack software engineering project for Programming 3 (Section 03), Faculty of Informatics and Applied Sciences (UTEC).
+Proyecto de investigación formativa e ingeniería de software Full-Stack desarrollado para la asignatura **Programación III (Sección 03)** de la Facultad de Informática y Ciencias Aplicadas de la Universidad Tecnológica de El Salvador (UTEC).
 
-What's New in This Update (v2.0 – Multi-Engine Persistence & Cloud Firestore)
+---
 
-Cloud Firestore Integration (firebase-admin 9.11.0): Added full asynchronous NoSQL persistence using Google Cloud Firestore (ApiFuture<T>), translating low-level SDK exceptions (InterruptedException, ExecutionException) into domain-level RepositorioException errors.
+## 🆕 Novedades de esta actualización (v2.0 – Persistencia Multimotor e Integración con Cloud Firestore)
 
-Dynamic Multi-Database Factory (FabricaRepositorio): Decoupled persistence engines via the MOTOR_BD environment variable (sqlserver, mongo, firestore), enabling hot-swapping between relational and cloud NoSQL backends without modifying UI or business logic.
+Esta versión incorpora mejoras importantes en la arquitectura, persistencia de datos, seguridad y gestión de inventario.
 
-Pessimistic Concurrency & ACID Transactions: Implemented atomic Firestore transactions (db.runTransaction(...)) for batch imports (all-or-nothing inserts), duplicate ID prevention, and stock/capacity adjustments that guarantee inventory never drops below zero.
+| Característica | Descripción |
+|---|---|
+| **Integración con Cloud Firestore** | Se incorporó persistencia NoSQL completamente asíncrona mediante Firebase Admin SDK 9.11.0 y `ApiFuture<T>`, convirtiendo excepciones de bajo nivel (`InterruptedException`, `ExecutionException`) en errores controlados de dominio mediante `RepositorioException`. |
+| **Fábrica dinámica de bases de datos (`FabricaRepositorio`)** | Se desacoplaron los motores de persistencia mediante la variable de entorno `MOTOR_BD` (`sqlserver`, `mongo`, `firestore`), permitiendo cambiar entre bases de datos relacionales y NoSQL sin modificar la interfaz ni la lógica de negocio. |
+| **Concurrencia y transacciones ACID** | Se implementaron transacciones atómicas de Firestore (`db.runTransaction(...)`) para importaciones masivas, prevención de identificadores duplicados y ajustes de inventario que garantizan que la disponibilidad nunca sea negativa. |
+| **Índices compuestos y agregaciones en memoria** | Se configuraron índices compuestos de Firestore (`categoria + nombre`) y se implementaron agrupaciones mediante Java Streams (`Collectors.groupingBy`) y filtros de texto para complementar las limitaciones de consultas NoSQL. |
+| **Seguridad IAM con privilegios mínimos** | Se reforzó el acceso a la nube utilizando cuentas de servicio dedicadas de Google Cloud con el rol `Cloud Datastore User`. Las credenciales externas se gestionan mediante `GOOGLE_APPLICATION_CREDENTIALS` y se excluyen del control de versiones. |
 
-Composite Indexing & In-Memory Aggregations: Configured Firestore composite indexes (categoria + nombre) and implemented Java Stream-based grouping (Collectors.groupingBy) and text filtering to bridge NoSQL query constraints.
+---
 
-Least-Privilege IAM Security: Hardened cloud access using dedicated Google Cloud Service Accounts (Cloud Datastore User role) via external GOOGLE_APPLICATION_CREDENTIALS keys excluded from version control.
+## 📋 Resumen Ejecutivo
 
-Executive Summary
+**Lumina Hotels & Resorts** es un ecosistema integral B2C de hospitalidad y turismo que combina una plataforma de reservas con un sistema administrativo de control de inventario en tiempo real.
 
-Lumina Hotels & Resorts is an end-to-end B2C hospitality and tourism booking ecosystem combined with a real-time administrative inventory control suite. Built to handle concurrent Online Transaction Processing (OLTP) and cloud-native workloads, the platform pairs a RESTful Java 21 backend supporting Microsoft SQL Server 2022, MongoDB Atlas, and Firebase Cloud Firestore with a native Android application crafted in Kotlin and Jetpack Compose (Material Design 3).
+El proyecto está diseñado para gestionar operaciones transaccionales concurrentes (OLTP) y cargas de trabajo nativas de la nube.
 
-From guest-first browsing and interactive calendar reservations to role-restricted Admin CRUD dashboards and live minibus capacity tracking, Lumina delivers a modern, resilient, and production-signed mobile experience.
+La arquitectura integra:
 
-Team Members
+- Un backend RESTful desarrollado en Java 21.
+- Compatibilidad con Microsoft SQL Server 2022, MongoDB Atlas y Firebase Cloud Firestore.
+- Una aplicación móvil nativa para Android desarrollada con Kotlin y Jetpack Compose.
+- Una interfaz basada en Material Design 3.
+- Un sistema de autenticación y autorización según roles.
+- Gestión de reservas, alojamientos, habitaciones y atracciones turísticas.
+- Control de disponibilidad y capacidad de transporte en tiempo real.
 
-No.
+Desde la exploración de hoteles y reservas mediante calendarios interactivos hasta los paneles administrativos con operaciones CRUD y el seguimiento de la capacidad de minibuses, Lumina ofrece una experiencia móvil moderna, adaptable y preparada para su distribución mediante una versión firmada de Android.
 
-Student ID
+---
 
-Full Name
+## 👥 Integrantes del equipo
 
-GitHub Username
+| N.º | Carnet | Nombre completo | Usuario de GitHub |
+|---|---|---|---|
+| 1 | 27-4135-2022 | AGUILAR ASCENCIO DAVID ALEXIS | [@DavidAlexis28](https://github.com/DavidAlexis28) |
+| 2 | 25-2531-2022 | AMAYA HERNANDEZ ANGEL OTONIEL | [@Otoniel34](https://github.com/Otoniel34) |
+| 3 | 25-0574-2024 | LARA LOPEZ CESAR GONZALO | [@cesarlaralopezlaralopez-prog](https://github.com/cesarlaralopezlaralopez-prog) |
+| 4 | 17-0613-2024 | MENJIVAR CHAVEZ RICARDO FABIO | [@Fabio-Menjivar](https://github.com/Fabio-Menjivar) |
+| 5 | 25-4222-2024 | MIRANDA GUZMAN ERICK ARMANDO | [@erickmiranda2703-maker](https://github.com/erickmiranda2703-maker) |
+| 6 | 25-4370-2023 | MORENO MEJIA HECTOR ANTONIO | [@hector-more](https://github.com/hector-more) |
+| 7 | 25-4370-2023 | REYES RODRIGUEZ SILVIA ARELY | [@SilviaReyes05](https://github.com/SilviaReyes05) |
 
-1
+**Docente:** Eliseo Ernesto Hernández Díaz
 
-27-4135-2022
+**Institución:** Facultad de Informática y Ciencias Aplicadas – Universidad Tecnológica de El Salvador (UTEC).
 
-AGUILAR ASCENCIO DAVID ALEXIS
+**Período académico:** 2026.
 
-@DavidAlexis28
+---
 
-2
+## 🚀 Características principales y funcionalidades
 
-25-2531-2022
+### 1. Experiencia para huéspedes y viajeros (Aplicación Android)
 
-AMAYA HERNANDEZ ANGEL OTONIEL
+La aplicación ofrece una experiencia orientada al usuario, permitiendo explorar los servicios disponibles antes de registrarse.
 
-@Otoniel34
+**Exploración sin autenticación**
 
-3
+- Inicio de la aplicación en modo invitado.
+- Exploración libre de hoteles, habitaciones y atracciones turísticas.
+- Posibilidad de iniciar sesión o crear una cuenta cuando el usuario lo decida.
 
-25-0574-2024
+**Sistema de reservas con dos catálogos**
 
-LARA LOPEZ CESAR GONZALO
+| Módulo | Funcionalidades |
+|---|---|
+| **Alojamientos** | Consulta de disponibilidad de habitaciones en tiempo real, precios por noche, filtrado por capacidad de huéspedes y visualización de servicios disponibles. |
+| **Atracciones** | Reservación de excursiones y experiencias turísticas, con seguimiento de disponibilidad de asientos en minibuses. |
 
-@cesarlaralopezlaralopez-prog
+**Gestión de transporte turístico**
 
-4
+- Seguimiento de capacidad de minibuses en tiempo real.
+- Capacidad configurable entre 8 y 15 pasajeros.
+- Capacidad predeterminada de 14 pasajeros.
 
-17-0613-2024
+**Calendarios interactivos con Material Design 3**
 
-MENJIVAR CHAVEZ RICARDO FABIO
+Se utilizan componentes `DatePickerDialog` en modo de calendario visual (`DisplayMode.Picker`) para seleccionar:
 
-@Fabio-Menjivar
+- Fechas de entrada y salida de alojamientos.
+- Fechas de excursiones.
+- Fecha de nacimiento.
+- Fecha de vencimiento del pasaporte.
 
-5
+**Perfil del viajero y favoritos**
 
-25-4222-2024
+- Gestión de información personal.
+- Administración de datos de contacto y nacionalidad.
+- Registro de información del pasaporte.
+- Lista persistente de hoteles y atracciones favoritas.
+- Historial de reservaciones.
 
-MIRANDA GUZMAN ERICK ARMANDO
+### 2. Seguridad por roles y panel administrativo CRUD
 
-@erickmiranda2703-maker
+El sistema incorpora control de acceso según el tipo de usuario.
 
-6
+**Acceso restringido para administradores**
 
-25-4370-2023
+- El Panel de Administración Lumina permanece oculto para los clientes convencionales.
+- El acceso administrativo está reservado para credenciales autorizadas con el dominio `@luminatravel.com`.
 
-MORENO MEJIA HECTOR ANTONIO
+**Operaciones CRUD en tiempo real**
 
-@hector-more
+CRUD corresponde a las operaciones Crear, Leer, Actualizar y Eliminar.
 
-7
+| Módulo administrativo | Funcionalidades |
+|---|---|
+| **Hoteles y habitaciones** | Crear establecimientos, modificar tipos de habitaciones, actualizar precios por noche, capacidades y cantidades disponibles, y eliminar alojamientos con confirmación. |
+| **Atracciones y minibuses** | Registrar excursiones, modificar precios, duración, descripciones y capacidad de pasajeros, y eliminar actividades con sincronización inmediata en el catálogo y la base de datos. |
 
-17-2696-2024
+### 3. Persistencia multimotor e integridad de datos
 
-REYES RODRIGUEZ SILVIA ARELY
+La plataforma implementa el patrón de diseño **Polymorphic Repository Pattern**, permitiendo intercambiar motores de persistencia durante la ejecución mediante la variable `MOTOR_BD`.
 
-@SilviaReyes05
+Motores compatibles:
 
-Instructor: Eliseo Ernesto Hernández Díaz
+- Microsoft SQL Server.
+- MongoDB Atlas.
+- Firebase Cloud Firestore.
 
-Institution: Faculty of Informatics and Applied Sciences (Universidad Tecnológica de El Salvador)
+**Protección de integridad de datos en cuatro niveles**
 
-Academic Term: 2026
+| Nivel | Mecanismo de protección |
+|---|---|
+| **1. Validación de dominio** | Reglas estrictas en los métodos setter que impiden registrar precios negativos o cantidades de inventario inválidas. |
+| **2. Sanitización contra inyección de rutas** | Validación de identificadores de documentos antes de construir rutas de Firestore. Se bloquean `/`, `.`, `..` y patrones reservados `__*__`. |
+| **3. Transacciones atómicas y unicidad** | Prevención de claves primarias duplicadas durante escrituras concurrentes y reversión de importaciones masivas cuando algún registro presenta conflictos. |
+| **4. Bloqueo pesimista de inventario** | Lectura y actualización de capacidades dentro de una misma transacción, evitando que las reservas concurrentes generen disponibilidad negativa. |
 
-Core Features & Capabilities
+---
 
-1. B2C Guest & Traveler Experience (Android App)
+## 🛠️ Tecnologías utilizadas
 
-Guest-First Exploration: Launches cleanly in unauthenticated guest mode so travelers can freely browse hotels, room tiers, and local attractions before deciding to sign in or create an account.
+La solución utiliza diferentes tecnologías distribuidas por capas arquitectónicas.
 
-Dual-Catalog Booking Engine:
+| Capa | Tecnología / Especificación | Función dentro de la arquitectura |
+|---|---|---|
+| Interfaz móvil y arquitectura | Kotlin, Jetpack Compose, Material Design 3, MVVM | Interfaz móvil declarativa y adaptable para clientes y administradores. |
+| Comunicación y concurrencia | Retrofit / REST Client, Kotlin Coroutines, StateFlow | Comunicación asíncrona con el backend y actualización reactiva de la interfaz. |
+| Servidor Backend | Java 21 (LTS), Maven, servidor HTTP REST integrado | Reglas de negocio, validación de roles y endpoints CRUD RESTful. |
+| Base de datos NoSQL en la nube | Firebase Admin SDK 9.11.0, Cloud Firestore (Standard) | Almacenamiento documental, índices compuestos y transacciones ACID. |
+| Bases de datos relacionales y documentales | Microsoft SQL Server 2022 (mssql-jdbc), MongoDB Atlas | Persistencia multimotor mediante `FabricaRepositorio`. |
+| Seguridad en la nube (IAM) | Google Cloud IAM, Cloud Datastore User, claves JSON ADC | Autenticación del servidor con privilegios mínimos y credenciales externas al repositorio. |
+| Construcción y empaquetado | Gradle (Kotlin DSL), Android Asset Studio, firma `.jks` | Generación de iconos adaptables y APK de distribución. |
 
-Alojamientos (Hotels & Rooms): Real-time room availability, nightly pricing, guest capacity filtering, and responsive amenity chips.
+---
 
-Atracciones (Guided Tours & Experiences): Ticket booking integrated with live small-minibus seat tracking (8–15 configurable seats, default 14).
+## 📁 Estructura del repositorio
 
-Interactive Material 3 Date Pickers: Modal DatePickerDialog components forced into visual calendar grid mode (DisplayMode.Picker) for check-in/check-out dates, tour schedules, date of birth, and passport expiration.
+La organización del proyecto está distribuida en módulos independientes para facilitar el mantenimiento, desarrollo y escalabilidad.
 
-Traveler Profile & Favorites: Persistent wishlist/favorites, booking history (Reservas), and extended traveler profile management (contact details, nationality, and passport information).
-
-2. Role-Based Security & Admin CRUD Dashboard
-
-Restricted Admin Access: The Panel de Administración Lumina is hidden from standard customer accounts and unlocked exclusively for authorized @luminatravel.com administrator credentials.
-
-Full Real-Time CRUD (Create, Read, Update, Delete):
-
-Hotel & Room Management: Create new properties, edit room typologies, nightly rates, guest capacities, and available room counts, or delete listings with confirmation safeguards.
-
-Attraction & Minibus Fleet Management: Add new tours, edit pricing, duration, descriptions, and small-minibus passenger capacities, or remove events with instant synchronization across the catalog and database.
-
-3. Multi-Engine Persistence & Data Integrity
-
-Polymorphic Repository Pattern: Switch seamlessly between SQL Server, MongoDB Atlas, and Cloud Firestore at runtime via MOTOR_BD.
-
-4-Layer Data Integrity Protection:
-
-Domain Validation: Strict setter rules preventing negative prices or inventory counts.
-
-Path-Injection Sanitization: Validates document IDs before constructing Firestore paths (blocking /, ., .., and reserved __*__ patterns).
-
-Atomic Batch & Uniqueness Transactions: Prevents duplicate primary keys under concurrent writes and rolls back batch inserts if any record collides.
-
-Pessimistic Stock Locking: Reads and updates capacity inside a single transaction so concurrent bookings never cause negative availability.
-
-Technology Stack
-
-Layer
-
-Technology / Specification
-
-Role in Architecture
-
-Mobile UI & Architecture
-
-Kotlin, Jetpack Compose, Material Design 3, MVVM
-
-Declarative, responsive B2C & Admin mobile interface
-
-Networking & Concurrency
-
-Retrofit / REST Client, Kotlin Coroutines, StateFlow
-
-Asynchronous API communication and reactive UI state
-
-Backend Server
-
-Java 21 (LTS), Maven, embedded REST HTTP Server (:8080)
-
-Business rules, role validation, and RESTful CRUD endpoints
-
-Cloud NoSQL Engine
-
-Firebase Admin SDK (9.11.0), Cloud Firestore (Standard)
-
-Serverless document storage, composite indexes & ACID transactions
-
-Relational & Document DBs
-
-Microsoft SQL Server 2022 (mssql-jdbc), MongoDB Atlas
-
-Multi-engine persistence via FabricaRepositorio
-
-Cloud Security (IAM)
-
-Google Cloud IAM (Cloud Datastore User), ADC JSON Keys
-
-Least-privilege server authentication outside the repository
-
-Build & Packaging
-
-Gradle (Kotlin DSL), Android Asset Studio, .jks Signing
-
-Multi-density adaptive icons and release APK generation
-
-Repository Structure
-
+```text
 LuminaHotels_CRUD_Completo/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                      # Automated CI pipeline (GitHub Actions)
+│       └── ci.yml                      # Integración continua con GitHub Actions
 │
 ├── database/
-│   ├── schema.sql                      # SQL Server relational tables & constraints
-│   └── init.sql                        # Seed data for hotels, rooms & attractions
+│   ├── schema.sql                      # Tablas y restricciones de SQL Server
+│   └── init.sql                        # Datos iniciales de hoteles, habitaciones y atracciones
 │
-├── docker/                             # Containerized SQL Server environment setup
+├── docker/                             # Configuración del entorno SQL Server con Docker
 │
-├── docs/                               # Formal academic & engineering documentation
-│   ├── entrega1-perfil.md              # Research profile document
-│   ├── adr/                            # Architecture Decision Records
-│   └── entorno.md                      # Reproducible environment specifications
+├── docs/                               # Documentación académica y técnica
+│   ├── entrega1-perfil.md              # Documento del perfil de investigación
+│   ├── adr/                            # Registros de decisiones arquitectónicas
+│   └── entorno.md                      # Especificaciones del entorno reproducible
 │
-├── backend/                            # Java 21 Maven REST & Multi-DB Backend
-│   ├── pom.xml                         # Dependencies (mssql-jdbc, mongodb, firebase-admin 9.11.0)
+├── backend/                            # Backend REST Java 21 con Maven y múltiples bases de datos
+│   ├── pom.xml                         # Dependencias del proyecto
 │   └── src/
 │       └── main/java/sv/edu/utec/
-│           ├── app/                    # REST Server, CLI Runner & Firestore/CRUD Verification Suites
-│           ├── datos/                  # FabricaRepositorio, ConexionFirestore, Firestore/Mongo/SQL Repos
-│           └── modelo/                 # Domain Entities & Aggregation DTOs
+│           ├── app/                    # Servidor REST, ejecución CLI y pruebas
+│           ├── datos/                  # Fábrica de repositorios y conexiones SQL, MongoDB y Firestore
+│           └── modelo/                 # Entidades del dominio y DTO de agregación
 │
-├── mobile/                             # Native Android Application (Jetpack Compose)
+├── mobile/                             # Aplicación Android nativa con Jetpack Compose
 │   ├── app/
 │   │   ├── src/main/
-│   │   │   ├── java/...                # UI Screens, Components, ViewModel, Repository, API
-│   │   │   ├── res/                    # Adaptive Launcher Icons (mipmap-*), Themes & Strings
-│   │   │   └── AndroidManifest.xml     # App permissions, network config & icon bindings
-│   │   └── build.gradle.kts            # App module dependencies & signing config
-│   └── build.gradle.kts                # Root Gradle configuration
+│   │   │   ├── java/...                # Pantallas, componentes, ViewModel, Repository y API
+│   │   │   ├── res/                    # Iconos, temas y cadenas de texto
+│   │   │   └── AndroidManifest.xml     # Permisos, configuración de red e iconos
+│   │   └── build.gradle.kts            # Dependencias y configuración de firma
+│   └── build.gradle.kts                # Configuración principal de Gradle
 │
-├── README.md                           # Project overview, setup & architecture guide
-├── LICENSE                             # MIT Open-Source License
-└── .gitignore                          # Keystore (*.jks), Service Account (*.json) & build exclusions
+├── README.md                           # Descripción, instalación y arquitectura
+├── LICENSE                             # Licencia de código abierto MIT
+└── .gitignore                          # Exclusiones de claves, credenciales y compilaciones
+```
 
+---
 
-Getting Started
+## ⚙️ Instalación y configuración (Getting Started)
 
-Prerequisites
+### Requisitos previos
 
-JDK 21 (LTS) & Apache Maven 3.9+
+Antes de ejecutar el proyecto, es necesario contar con las siguientes herramientas y servicios:
 
-Firebase Project with Cloud Firestore (Standard edition, Production Mode) & a Service Account JSON key (Cloud Datastore User role)
+| Requisito | Versión / Especificación |
+|---|---|
+| Java Development Kit (JDK) | 21 LTS |
+| Apache Maven | 3.9 o superior |
+| Firebase | Proyecto con Cloud Firestore, edición Standard y modo Production |
+| Cuenta de servicio de Google Cloud | Archivo JSON con rol `Cloud Datastore User` |
+| Microsoft SQL Server | 2022 (opcional, según el motor seleccionado) |
+| MongoDB Atlas | Instancia configurada (opcional, según el motor seleccionado) |
+| Android Studio o IntelliJ IDEA | Con Android SDK instalado |
+| Android SDK | API 26 o superior |
 
-Microsoft SQL Server 2022 or MongoDB Atlas (optional, depending on active MOTOR_BD)
+### 1. Clonar el repositorio
 
-Android Studio / IntelliJ IDEA with Android SDK (API 26+)
+Ejecutar los siguientes comandos en una terminal:
 
-1. Clone the Repository
-
+```bash
 git clone https://github.com/DavidAlexis28/lumina-hotels-resorts.git
+
 cd lumina-hotels-resorts
+```
 
+### 2. Configurar las variables de entorno
 
-2. Configure Environment Variables
+La clave JSON de la cuenta de servicio de Firebase debe almacenarse fuera de la carpeta del proyecto.
 
-Store your Firebase Service Account key outside the project folder (e.g., C:\Users\<user>\claves\distrisalva-app.json or ~/claves/distrisalva-app.json) and configure your environment:
+Ejemplo de ubicación:
 
-# Select persistence engine: firestore | mongo | sqlserver
+```text
+C:\Users\<usuario>\claves\distrisalva-app.json
+```
+
+En Linux o macOS:
+
+```text
+~/claves/distrisalva-app.json
+```
+
+Configurar las siguientes variables de entorno:
+
+**Selección del motor de persistencia**
+
+```bash
+# Motores disponibles: firestore | mongo | sqlserver
+
 export MOTOR_BD=firestore
+```
 
-# Path to Google Cloud Service Account key (never commit this file)
+**Credenciales de Google Cloud**
+
+```bash
+# Ruta de la clave JSON de la cuenta de servicio.
+# Nunca subir este archivo a GitHub.
+
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/claves/distrisalva-app.json"
+```
 
+> **Importante:** En Windows, si se utiliza PowerShell, las variables de entorno pueden configurarse mediante `$env:MOTOR_BD="firestore"` y `$env:GOOGLE_APPLICATION_CREDENTIALS="C:\ruta\claves\distrisalva-app.json"`.
 
-3. Run the Java Backend (Port 8080)
+### 3. Ejecutar el Backend Java (Puerto 8080)
 
+Abrir una terminal dentro de la carpeta del backend:
+
+```bash
 cd backend
+```
+
+Ejecutar:
+
+```bash
 mvn clean compile exec:java
+```
 
+El servidor REST estará disponible en:
 
-The REST server starts on http://localhost:8080 (accessible from the Android Emulator via http://10.0.2.2:8080).
+```text
+http://localhost:8080
+```
 
-Note: On first execution of category-sorted queries in Firestore, follow the console link to enable the composite index (categoria ASC, nombre ASC).
+Para acceder desde un emulador Android, utilizar:
 
-4. Run the Android Mobile App
+```text
+http://10.0.2.2:8080
+```
 
-Open the mobile/ project in IntelliJ IDEA or Android Studio.
+**Nota sobre Firestore:**
 
-Let Gradle sync all Jetpack Compose and Material 3 dependencies.
+Durante la primera ejecución de consultas ordenadas por categoría, Firestore puede solicitar la creación de un índice compuesto.
 
-Select an Android Emulator (API 26+) and click Run (▶).
+En ese caso:
 
-Demo & Administrative Access
+1. Revisar el enlace proporcionado en la consola.
+2. Abrir el enlace de configuración del índice.
+3. Habilitar el índice compuesto correspondiente.
+4. Esperar a que su estado sea activo.
 
-Role
+Índice requerido:
 
-Access Behavior
+- `categoria` en orden ascendente.
+- `nombre` en orden ascendente.
 
-Credentials
+### 4. Ejecutar la aplicación móvil Android
 
-Guest Traveler
+1. Abrir la carpeta `mobile/` desde IntelliJ IDEA o Android Studio.
+2. Esperar a que Gradle sincronice todas las dependencias de Jetpack Compose y Material Design 3.
+3. Seleccionar un emulador Android con API 26 o superior.
+4. Ejecutar la aplicación mediante el botón **Run (▶)**.
+5. Comprobar la comunicación entre la aplicación móvil y el servidor REST.
 
-Default state on app launch; browse all hotels & attractions freely
+---
 
-No login required
+## 🔐 Demostración y acceso administrativo
 
-Registered Customer
+El sistema contempla tres modalidades de acceso:
 
-Create an account or sign in with any standard email to book & save favorites
+| Rol | Comportamiento | Credenciales |
+|---|---|---|
+| **Invitado** | Acceso predeterminado al iniciar la aplicación. Permite explorar hoteles y atracciones sin autenticación. | No requiere inicio de sesión. |
+| **Cliente registrado** | Puede crear una cuenta o iniciar sesión para realizar reservas y guardar favoritos. | Correo electrónico y contraseña válidos. |
+| **Administrador del sistema** | Permite acceder al Panel de Administración desde la sección Mi cuenta para gestionar hoteles y atracciones mediante operaciones CRUD. | Cuenta administrativa autorizada. |
 
-Any valid email & password
+**Credenciales administrativas de demostración**
 
-System Administrator
+```text
+Correo electrónico: admin@luminatravel.com
+Contraseña: AdminLumina2026!
+```
 
-Unlocks Panel Admin inside Mi cuenta for full Hotel & Attraction CRUD
+> **Advertencia de seguridad:** Estas credenciales son únicamente para demostración. No deben utilizarse en un entorno de producción ni mantenerse expuestas en un repositorio público. Se recomienda utilizar variables de entorno y credenciales seguras.
 
-Email: admin@luminatravel.com
+---
 
+## 📦 Generación del APK firmado (Deployment)
 
+Para generar una versión firmada de la aplicación Android destinada a distribución:
 
-Password: AdminLumina2026!
+1. Abrir el proyecto desde IntelliJ IDEA o Android Studio.
+2. Seleccionar la opción:
 
-Deployment & Signed APK Build
+   `Build > Generate Signed Bundle / APK...`
 
-To generate a production-signed release APK:
+3. Seleccionar **APK**.
+4. Indicar la ubicación del archivo de almacenamiento de claves (`.jks`).
+5. Seleccionar el alias correspondiente (`key0`).
+6. Elegir la variante de compilación `release`.
+7. Presionar **Create** para generar el APK.
 
-Navigate to Build > Generate Signed Bundle / APK... in IntelliJ IDEA / Android Studio.
+**Ubicación del archivo generado:**
 
-Select APK and point to your .jks keystore (key0 alias).
+```text
+mobile/app/build/outputs/apk/release/app-release.apk
+```
 
-Choose the release build variant and click Create.
+Este archivo corresponde a la versión firmada de la aplicación y puede utilizarse para su instalación y distribución.
 
-Locate the signed deliverable at mobile/app/build/outputs/apk/release/app-release.apk.
+---
 
-License
+## 📄 Licencia
 
-This project is developed for academic and research purposes at the Faculty of Informatics and Applied Sciences and is distributed under the terms of the MIT License.
+Este proyecto ha sido desarrollado con fines académicos y de investigación en la Facultad de Informática y Ciencias Aplicadas de la Universidad Tecnológica de El Salvador (UTEC).
+
+Se distribuye bajo los términos de la **Licencia MIT**, que permite utilizar, modificar y distribuir el software de acuerdo con las condiciones establecidas en dicha licencia.
+
+Consulta el archivo [LICENSE](LICENSE) para conocer los términos completos.
+
+---
+
+## 🎓 Proyecto académico
+
+**Lumina Hotels & Resorts – Programación III**
+
+Facultad de Informática y Ciencias Aplicadas
+
+Universidad Tecnológica de El Salvador (UTEC)
+
+**Año: 2026**
+
