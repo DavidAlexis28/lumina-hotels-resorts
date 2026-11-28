@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 
 android {
@@ -59,6 +60,9 @@ dependencies {
     // Carga asíncrona de imágenes y caching visual (Booking-style UI)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // AndroidX Browser Custom Tabs para pasarela segura PayPal Checkout
+    implementation("androidx.browser:browser:1.10.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
@@ -66,4 +70,14 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Supabase Kotlin SDK (Postgrest, Storage, Realtime, Functions)
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.1"))
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
+    implementation("io.github.jan-tennert.supabase:realtime-kt")
+    implementation("io.github.jan-tennert.supabase:functions-kt")
+
+    // Ktor HTTP engine required by Supabase on Android
+    implementation("io.ktor:ktor-client-okhttp:3.0.3")
 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,16 +33,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.lumina.luminahotels.data.mock.MockDataProvider
 import com.lumina.luminahotels.domain.validation.FormValidator
+import com.lumina.luminahotels.data.remote.PaymentGatewayManager
 import com.lumina.luminahotels.model.*
 import com.lumina.luminahotels.ui.components.*
 import com.lumina.luminahotels.ui.theme.GoldAccent
 import com.lumina.luminahotels.ui.theme.NavyDeep
 import com.lumina.luminahotels.ui.theme.NavyLight
 import com.lumina.luminahotels.viewmodel.HotelViewModel
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 // =========================================================================
-// 1. PESTAÑA PRINCIPAL: "BUSCAR" CON SELECTOR SUPERIOR ALOJAMIENTOS / ATRACCIONES
+// 1. PESTANA PRINCIPAL: "BUSCAR" CON SELECTOR SUPERIOR ALOJAMIENTOS / ATRACCIONES
 // =========================================================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -304,7 +307,7 @@ fun StaysSearchSection(
                                     .height(180.dp)
                             ) {
                                 LuminaNetworkImage(
-                                    url = hotel.imageUrl,
+                                    url = hotel.coverImage,
                                     contentDescription = hotel.name,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -519,7 +522,7 @@ fun AttractionsSearchSection(
                                     .height(170.dp)
                             ) {
                                 LuminaNetworkImage(
-                                    url = attr.imageUrl,
+                                    url = attr.coverImage,
                                     contentDescription = attr.title,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -586,13 +589,13 @@ fun AttractionsSearchSection(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Icon(
-                                            Icons.Default.DirectionsBus,
+                                            Icons.Default.Explore,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            text = "Transporte: Microbús pequeño • ${attr.availableSpots} / ${attr.minibusCapacity} spots disponibles",
+                                            text = "${attr.availableSpots} / ${attr.minibusCapacity} cupos disponibles",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface,
@@ -650,8 +653,8 @@ fun FavoritesScreen(
     val hotelsState by viewModel.hotelsState.collectAsState()
     val attractionsState by viewModel.attractionsState.collectAsState()
 
-    val allHotels = (hotelsState as? UiState.Success)?.data ?: MockDataProvider.defaultHotels
-    val allAttractions = (attractionsState as? UiState.Success)?.data ?: MockDataProvider.defaultAttractions
+    val allHotels = (hotelsState as? UiState.Success)?.data ?: emptyList()
+    val allAttractions = (attractionsState as? UiState.Success)?.data ?: emptyList()
 
     val favHotels = allHotels.filter { favoriteHotelIds.contains(it.id) }
     val favAttractions = allAttractions.filter { favoriteAttractionIds.contains(it.id) }
@@ -787,11 +790,9 @@ fun FavoritesScreen(
 fun AccountOrLoginScreen(viewModel: HotelViewModel) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
-    val savedCards by viewModel.savedCards.collectAsState()
     val pastTransactions by viewModel.pastTransactions.collectAsState()
 
     var showAuthModal by remember { mutableStateOf(false) }
-    var showAddCardModal by remember { mutableStateOf(false) }
     var showCountryPicker by remember { mutableStateOf(false) }
 
     // Estados editables de datos personales
@@ -1004,7 +1005,7 @@ fun AccountOrLoginScreen(viewModel: HotelViewModel) {
                                             Text("ADMIN", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                         }
                                     }
-                                    Text("Inventario en tiempo real, cuartos, microbús y altas", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Inventario en tiempo real de Alojamientos y Atracciones", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = "Abrir Panel Admin", tint = MaterialTheme.colorScheme.primary)
@@ -1210,7 +1211,7 @@ fun AccountOrLoginScreen(viewModel: HotelViewModel) {
                 }
             }
 
-            // 2. MÉTODOS DE PAGO
+            // 2. MÉTODOS DE PAGO (PAGO SEGURO STRIPE)
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -1220,57 +1221,27 @@ fun AccountOrLoginScreen(viewModel: HotelViewModel) {
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Text("Métodos de pago", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            }
-                            IconButton(onClick = { showAddCardModal = true }) {
-                                Icon(Icons.Default.AddCard, contentDescription = "Añadir tarjeta", tint = MaterialTheme.colorScheme.primary)
-                            }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Pagos seguros cifrados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
-
-                        if (savedCards.isEmpty()) {
-                            Text("No tienes tarjetas guardadas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            savedCards.forEach { card ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            Icon(Icons.Default.Payment, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                            Column {
-                                                Text("${card.cardBrand} ${card.cardNumberMasked}", fontWeight = FontWeight.Bold)
-                                                Text("Vence ${card.expiry} • ${card.cardHolder}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
-                                        IconButton(onClick = { viewModel.eliminarTarjeta(card.id) }) {
-                                            Icon(Icons.Default.DeleteOutline, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = { showAddCardModal = true },
-                            shape = RoundedCornerShape(10.dp),
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Añadir nueva tarjeta")
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    text = "Por su seguridad y cumplimiento PCI-DSS, la app no almacena datos de tarjetas de crédito. Los pagos en línea se procesan de forma cifrada mediante Stripe PaymentSheet.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -1362,17 +1333,6 @@ fun AccountOrLoginScreen(viewModel: HotelViewModel) {
             onLogin = { email, pass, name ->
                 viewModel.iniciarSesion(email, pass, name)
                 showAuthModal = false
-            }
-        )
-    }
-
-    // Modal de Añadir Tarjeta
-    if (showAddCardModal) {
-        DialogoAgregarTarjeta(
-            onDismiss = { showAddCardModal = false },
-            onAdd = { num, holder, exp ->
-                viewModel.agregarTarjeta(num, holder, exp)
-                showAddCardModal = false
             }
         )
     }
@@ -1517,14 +1477,14 @@ fun AdminDashboardDialog(
                         Tab(
                             selected = adminTab == 0,
                             onClick = { adminTab = 0 },
-                            text = { Text("Alojamientos (Cuartos)", fontWeight = FontWeight.Bold) },
+                            text = { Text("Alojamientos", fontWeight = FontWeight.Bold) },
                             icon = { Icon(Icons.Default.Hotel, contentDescription = null) }
                         )
                         Tab(
                             selected = adminTab == 1,
                             onClick = { adminTab = 1 },
-                            text = { Text("Atracciones (Microbús)", fontWeight = FontWeight.Bold) },
-                            icon = { Icon(Icons.Default.DirectionsBus, contentDescription = null) }
+                            text = { Text("Atracciones", fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Default.Explore, contentDescription = null) }
                         )
                     }
 
@@ -1549,9 +1509,9 @@ fun AdminDashboardDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                            Text("Control de Cuartos Disponibles", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                            val totalRooms = hotels.sumOf { h -> h.rooms.sumOf { it.availableRooms } }
-                                            Text("$totalRooms cuartos disponibles en ${hotels.size} hoteles", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("Inventario de Alojamientos", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                            val totalUnits = hotels.sumOf { h -> h.rooms.sumOf { it.availableRooms } }
+                                            Text("$totalUnits unidades disponibles en ${hotels.size} alojamientos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         Button(
                                             onClick = { showAddHotelDialog = true },
@@ -1565,116 +1525,128 @@ fun AdminDashboardDialog(
                                 }
                             }
 
-                            items(hotels, key = { it.id }) { hotel ->
-                                val hotelAvailable = hotel.rooms.sumOf { it.availableRooms }
-                                Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                                Text(hotel.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                                Text("${hotel.city} • ${hotel.starRating} estrellas", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer
+                            if (hotels.isEmpty()) {
+                                item {
+                                    EmptyStateView(
+                                        icon = Icons.Default.Hotel,
+                                        title = "No hay alojamientos registrados",
+                                        description = "Comienza agregando el primer alojamiento a la base de datos de Supabase.",
+                                        actionText = "Agregar Alojamiento",
+                                        onActionClick = { showAddHotelDialog = true }
+                                    )
+                                }
+                            } else {
+                                items(hotels, key = { it.id }) { hotel ->
+                                    val hotelAvailable = hotel.rooms.sumOf { it.availableRooms }
+                                    Card(
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "$hotelAvailable cuartos en total",
-                                                    fontWeight = FontWeight.Bold,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    maxLines = 1,
-                                                    softWrap = false
-                                                )
-                                            }
-                                        }
-
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                                        hotel.rooms.forEach { room ->
-                                            Surface(
-                                                shape = RoundedCornerShape(10.dp),
-                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = room.name,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            modifier = Modifier.weight(1f).padding(end = 8.dp),
-                                                            maxLines = 2,
-                                                            softWrap = true
-                                                        )
-                                                        Surface(
-                                                            shape = RoundedCornerShape(6.dp),
-                                                            color = if (room.availableRooms > 0) Color(0xFFDCFCE7) else Color(0xFFFFEBEE),
-                                                            modifier = Modifier.wrapContentWidth()
-                                                        ) {
-                                                            Text(
-                                                                text = "${room.availableRooms} cuartos disponibles",
-                                                                color = if (room.availableRooms > 0) Color(0xFF15803D) else Color(0xFFC62828),
-                                                                fontWeight = FontWeight.Bold,
-                                                                style = MaterialTheme.typography.labelSmall,
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                                                maxLines = 1,
-                                                                softWrap = false
-                                                            )
-                                                        }
-                                                    }
+                                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                                    Text(hotel.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                                    Text("${hotel.city} • ${hotel.starRating} estrellas", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = MaterialTheme.colorScheme.primaryContainer
+                                                ) {
                                                     Text(
-                                                        text = "Capacidad: ${room.capacity} huéspedes • US$${String.format("%.2f", room.pricePerNight)} / noche",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    val ratio = room.availableRooms.toFloat() / room.totalRooms.coerceAtLeast(1)
-                                                    LinearProgressIndicator(
-                                                        progress = { ratio.coerceIn(0f, 1f) },
-                                                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                                        text = "$hotelAvailable unidades disponibles",
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.labelMedium,
                                                         color = MaterialTheme.colorScheme.primary,
-                                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        maxLines = 1,
+                                                        softWrap = false
                                                     )
                                                 }
                                             }
-                                        }
 
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            OutlinedButton(
-                                                onClick = { hotelToEdit = hotel },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Editar")
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                            hotel.rooms.forEach { room ->
+                                                Surface(
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = room.name,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                                                maxLines = 2,
+                                                                softWrap = true
+                                                            )
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = if (room.availableRooms > 0) Color(0xFFDCFCE7) else Color(0xFFFFEBEE),
+                                                                modifier = Modifier.wrapContentWidth()
+                                                            ) {
+                                                                Text(
+                                                                    text = "${room.availableRooms} disponibles",
+                                                                    color = if (room.availableRooms > 0) Color(0xFF15803D) else Color(0xFFC62828),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    style = MaterialTheme.typography.labelSmall,
+                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                                    maxLines = 1,
+                                                                    softWrap = false
+                                                                )
+                                                            }
+                                                        }
+                                                        Text(
+                                                            text = "Capacidad: ${room.capacity} huéspedes • US$${String.format("%.2f", room.pricePerNight)} / noche • ${room.availableRooms} de ${room.totalRooms} unidades",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        val ratio = room.availableRooms.toFloat() / room.totalRooms.coerceAtLeast(1)
+                                                        LinearProgressIndicator(
+                                                            progress = { ratio.coerceIn(0f, 1f) },
+                                                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                                        )
+                                                    }
+                                                }
                                             }
-                                            OutlinedButton(
-                                                onClick = { hotelToDelete = hotel },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(8.dp),
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC92A3E))
+
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFC92A3E), modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Eliminar")
+                                                OutlinedButton(
+                                                    onClick = { hotelToEdit = hotel },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Editar")
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { hotelToDelete = hotel },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC92A3E))
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFC92A3E), modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Eliminar")
+                                                }
                                             }
                                         }
                                     }
@@ -1702,8 +1674,9 @@ fun AdminDashboardDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                            Text("Atracciones con Microbús pequeño", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                            Text("Capacidad estándar: 14 pasajeros (8–15 configurables)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("Catálogo de Atracciones", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                            val totalSpots = attractions.sumOf { it.availableSpots }
+                                            Text("$totalSpots cupos disponibles en ${attractions.size} atracciones", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         Button(
                                             onClick = { showAddAttractionDialog = true },
@@ -1717,108 +1690,120 @@ fun AdminDashboardDialog(
                                 }
                             }
 
-                            items(attractions, key = { it.id }) { attr ->
-                                Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(attr.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
-                                            Surface(
-                                                shape = RoundedCornerShape(6.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer
+                            if (attractions.isEmpty()) {
+                                item {
+                                    EmptyStateView(
+                                        icon = Icons.Default.Explore,
+                                        title = "No hay atracciones registradas",
+                                        description = "Comienza agregando la primera atracción a la base de datos de Supabase.",
+                                        actionText = "Agregar Atracción",
+                                        onActionClick = { showAddAttractionDialog = true }
+                                    )
+                                }
+                            } else {
+                                items(attractions, key = { it.id }) { attr ->
+                                    Card(
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "US$${String.format("%.2f", attr.pricePerPerson)}",
-                                                    fontWeight = FontWeight.Bold,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    maxLines = 1,
-                                                    softWrap = false
-                                                )
-                                            }
-                                        }
-                                        Text("${attr.city} • ${attr.category} • ${attr.duration}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                Text(attr.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = MaterialTheme.colorScheme.primaryContainer
                                                 ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                        modifier = Modifier.weight(1f).padding(end = 8.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                                        Text("Transporte: Microbús pequeño", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 2, softWrap = true)
-                                                    }
-                                                    Surface(
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        color = if (attr.availableSpots <= 3) Color(0xFFFFEBEE) else Color(0xFFDCFCE7)
-                                                    ) {
-                                                        Text(
-                                                            text = "${attr.availableSpots} / ${attr.minibusCapacity} spots disponibles",
-                                                            fontWeight = FontWeight.Bold,
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = if (attr.availableSpots <= 3) Color(0xFFC62828) else Color(0xFF15803D),
-                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                                            maxLines = 1,
-                                                            softWrap = false
-                                                        )
-                                                    }
+                                                    Text(
+                                                        text = "US$${String.format("%.2f", attr.pricePerPerson)}",
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        maxLines = 1,
+                                                        softWrap = false
+                                                    )
                                                 }
-                                                val occupancy = (attr.minibusCapacity - attr.availableSpots).toFloat() / attr.minibusCapacity.coerceAtLeast(1)
-                                                LinearProgressIndicator(
-                                                    progress = { occupancy.coerceIn(0f, 1f) },
-                                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                                    color = if (attr.availableSpots <= 3) Color(0xFFC62828) else MaterialTheme.colorScheme.primary,
-                                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                                )
-                                                Text(
-                                                    text = "Capacidad: ${attr.minibusCapacity} asientos (${attr.minibusCapacity - attr.availableSpots} ocupados, ${attr.availableSpots} disponibles)",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
                                             }
-                                        }
+                                            Text("${attr.city} • ${attr.category} • ${attr.duration}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            OutlinedButton(
-                                                onClick = { attractionToEdit = attr },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(8.dp)
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Editar")
+                                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                                        ) {
+                                                            Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                            Text("Capacidad de la experiencia", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 2, softWrap = true)
+                                                        }
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = if (attr.availableSpots <= 3) Color(0xFFFFEBEE) else Color(0xFFDCFCE7)
+                                                        ) {
+                                                            Text(
+                                                                text = "${attr.availableSpots} / ${attr.minibusCapacity} cupos disponibles",
+                                                                fontWeight = FontWeight.Bold,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = if (attr.availableSpots <= 3) Color(0xFFC62828) else Color(0xFF15803D),
+                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                                maxLines = 1,
+                                                                softWrap = false
+                                                            )
+                                                        }
+                                                    }
+                                                    val occupancy = (attr.minibusCapacity - attr.availableSpots).toFloat() / attr.minibusCapacity.coerceAtLeast(1)
+                                                    LinearProgressIndicator(
+                                                        progress = { occupancy.coerceIn(0f, 1f) },
+                                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                        color = if (attr.availableSpots <= 3) Color(0xFFC62828) else MaterialTheme.colorScheme.primary,
+                                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                                    )
+                                                    Text(
+                                                        text = "Capacidad: ${attr.minibusCapacity} cupos (${attr.minibusCapacity - attr.availableSpots} reservados, ${attr.availableSpots} disponibles)",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
                                             }
-                                            OutlinedButton(
-                                                onClick = { attractionToDelete = attr },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(8.dp),
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC92A3E))
+
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFC92A3E), modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Eliminar")
+                                                OutlinedButton(
+                                                    onClick = { attractionToEdit = attr },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Editar")
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { attractionToDelete = attr },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC92A3E))
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFC92A3E), modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Eliminar")
+                                                }
                                             }
                                         }
                                     }
@@ -1834,6 +1819,7 @@ fun AdminDashboardDialog(
     if (showAddHotelDialog) {
         DialogoAgregarAlojamiento(
             onDismiss = { showAddHotelDialog = false },
+            onUploadImageBytes = { bytes -> viewModel.subirFotoCatalogo(bytes, "accommodations") },
             onSave = { name, city, stars, desc, amenities, img, roomName, price, cap, availableRooms ->
                 viewModel.crearAlojamiento(
                     name = name,
@@ -1855,7 +1841,8 @@ fun AdminDashboardDialog(
     if (showAddAttractionDialog) {
         DialogoAgregarAtraccion(
             onDismiss = { showAddAttractionDialog = false },
-            onSave = { title, city, category, duration, price, desc, img, minibusCap ->
+            onUploadImageBytes = { bytes -> viewModel.subirFotoCatalogo(bytes, "attractions") },
+            onSave = { title, city, category, duration, price, desc, img, capacity ->
                 viewModel.crearAtraccion(
                     title = title,
                     city = city,
@@ -1864,7 +1851,7 @@ fun AdminDashboardDialog(
                     pricePerPerson = price,
                     description = desc,
                     imageUrl = img,
-                    minibusCapacity = minibusCap,
+                    minibusCapacity = capacity,
                     onSuccess = { showAddAttractionDialog = false }
                 )
             }
@@ -1876,6 +1863,7 @@ fun AdminDashboardDialog(
         DialogoEditarAlojamiento(
             hotel = h,
             onDismiss = { hotelToEdit = null },
+            onUploadImageBytes = { bytes -> viewModel.subirFotoCatalogo(bytes, "accommodations") },
             onSave = { name, city, stars, desc, amenities, img, roomName, price, cap, availableRooms ->
                 viewModel.actualizarAlojamiento(
                     hotelId = h.id,
@@ -1912,7 +1900,8 @@ fun AdminDashboardDialog(
         DialogoEditarAtraccion(
             attraction = a,
             onDismiss = { attractionToEdit = null },
-            onSave = { title, city, category, duration, price, desc, img, minibusCap ->
+            onUploadImageBytes = { bytes -> viewModel.subirFotoCatalogo(bytes, "attractions") },
+            onSave = { title, city, category, duration, price, desc, img, capacity ->
                 viewModel.actualizarAtraccionAdmin(
                     attrId = a.id,
                     title = title,
@@ -1922,7 +1911,7 @@ fun AdminDashboardDialog(
                     pricePerPerson = price,
                     description = desc,
                     imageUrl = img,
-                    minibusCapacity = minibusCap,
+                    minibusCapacity = capacity,
                     onSuccess = { attractionToEdit = null }
                 )
             }
@@ -1999,6 +1988,7 @@ fun DialogoConfirmarEliminarAtraccion(
 fun DialogoEditarAlojamiento(
     hotel: Hotel,
     onDismiss: () -> Unit,
+    onUploadImageBytes: suspend (ByteArray) -> Result<String>,
     onSave: (
         name: String,
         city: String,
@@ -2028,7 +2018,7 @@ fun DialogoEditarAlojamiento(
 
     val isFormValid = name.isNotBlank() && city.isNotBlank() && description.isNotBlank() &&
                       roomName.isNotBlank() && (pricePerNight.toDoubleOrNull() ?: 0.0) > 0.0 &&
-                      availableRooms > 0
+                      availableRooms >= 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2087,22 +2077,77 @@ fun DialogoEditarAlojamiento(
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
-                        ValidatedTextField(
-                            value = capacity.toString(),
-                            onValueChange = { capacity = it.toIntOrNull()?.coerceAtLeast(1) ?: 2 },
-                            label = "Huéspedes",
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Huéspedes:", style = MaterialTheme.typography.bodySmall)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                FilledTonalIconButton(
+                                    onClick = { if (capacity > 1) capacity-- },
+                                    enabled = capacity > 1
+                                ) { Icon(Icons.Default.Remove, contentDescription = null) }
+                                Text("$capacity", fontWeight = FontWeight.Bold)
+                                FilledTonalIconButton(
+                                    onClick = { if (capacity < 8) capacity++ },
+                                    enabled = capacity < 8
+                                ) { Icon(Icons.Default.Add, contentDescription = null) }
+                            }
+                        }
                     }
                 }
                 item {
-                    ValidatedTextField(
-                        value = availableRooms.toString(),
-                        onValueChange = { availableRooms = it.toIntOrNull()?.coerceAtLeast(1) ?: 1 },
-                        label = "Cuartos disponibles *",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 12.dp)
+                            ) {
+                                Text(
+                                    text = "Cantidad disponible:",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Inventario total de unidades",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilledTonalIconButton(
+                                    onClick = { if (availableRooms > 0) availableRooms-- },
+                                    enabled = availableRooms > 0
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad")
+                                }
+                                Text(
+                                    text = "$availableRooms",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.widthIn(min = 28.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                FilledTonalIconButton(
+                                    onClick = { if (availableRooms < 999) availableRooms++ },
+                                    enabled = availableRooms < 999
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Aumentar cantidad")
+                                }
+                            }
+                        }
+                    }
                 }
                 item {
                     Text("Amenidades principales:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
@@ -2129,11 +2174,10 @@ fun DialogoEditarAlojamiento(
                     )
                 }
                 item {
-                    ValidatedTextField(
-                        value = imageUrl,
-                        onValueChange = { imageUrl = it },
-                        label = "URL de imagen",
-                        leadingIcon = Icons.Default.Image
+                    CatalogImagePicker(
+                        imageUrl = imageUrl,
+                        onImageUrlChange = { imageUrl = it },
+                        onUploadImageBytes = onUploadImageBytes
                     )
                 }
             }
@@ -2170,6 +2214,7 @@ fun DialogoEditarAlojamiento(
 fun DialogoEditarAtraccion(
     attraction: TouristAttraction,
     onDismiss: () -> Unit,
+    onUploadImageBytes: suspend (ByteArray) -> Result<String>,
     onSave: (
         title: String,
         city: String,
@@ -2276,12 +2321,12 @@ fun DialogoEditarAtraccion(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Text("Microbús pequeño", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                    Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text("Capacidad de la experiencia", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                 }
                                 Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
                                     Text(
-                                        text = "$minibusCapacity asientos",
+                                        text = "$minibusCapacity cupos",
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
@@ -2290,7 +2335,7 @@ fun DialogoEditarAtraccion(
                                 }
                             }
                             Text(
-                                text = "Capacidad del microbús configurable entre 8 y 15 pasajeros.",
+                                text = "Capacidad máxima de asistentes configurable entre 8 y 15 cupos.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2304,11 +2349,10 @@ fun DialogoEditarAtraccion(
                     }
                 }
                 item {
-                    ValidatedTextField(
-                        value = imageUrl,
-                        onValueChange = { imageUrl = it },
-                        label = "URL de imagen",
-                        leadingIcon = Icons.Default.Image
+                    CatalogImagePicker(
+                        imageUrl = imageUrl,
+                        onImageUrlChange = { imageUrl = it },
+                        onUploadImageBytes = onUploadImageBytes
                     )
                 }
             }
@@ -2345,6 +2389,7 @@ fun DialogoEditarAtraccion(
 @Composable
 fun DialogoAgregarAlojamiento(
     onDismiss: () -> Unit,
+    onUploadImageBytes: suspend (ByteArray) -> Result<String>,
     onSave: (
         name: String,
         city: String,
@@ -2366,14 +2411,14 @@ fun DialogoAgregarAlojamiento(
     var pricePerNight by remember { mutableStateOf("125.00") }
     var capacity by remember { mutableIntStateOf(2) }
     var initialAvailableRooms by remember { mutableIntStateOf(5) }
-    var imageUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80") }
+    var imageUrl by remember { mutableStateOf("") }
 
     val amenityOptions = listOf("Piscina Infinita", "Spa & Wellness", "Wi-Fi de Alta Velocidad", "Desayuno Buffet", "Gimnasio 24/7", "Valet Parking", "Restaurante Gourmet")
     var selectedAmenities by remember { mutableStateOf(setOf("Wi-Fi de Alta Velocidad", "Desayuno Buffet", "Piscina Infinita")) }
 
     val isFormValid = name.isNotBlank() && city.isNotBlank() && description.isNotBlank() &&
                       roomName.isNotBlank() && (pricePerNight.toDoubleOrNull() ?: 0.0) > 0.0 &&
-                      initialAvailableRooms > 0
+                      initialAvailableRooms >= 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2447,7 +2492,7 @@ fun DialogoAgregarAlojamiento(
                 }
                 item {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text("Configuración de Habitación & Disponibilidad:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Configuración de Unidad & Disponibilidad:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 item {
                     ValidatedTextField(
@@ -2492,27 +2537,61 @@ fun DialogoAgregarAlojamiento(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("Cantidad de cuartos disponibles:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                Text("Inventario inicial en base de datos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 12.dp)
+                            ) {
+                                Text(
+                                    text = "Cantidad disponible:",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Inventario inicial en base de datos",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 FilledTonalIconButton(
-                                    onClick = { if (initialAvailableRooms > 1) initialAvailableRooms-- },
-                                    enabled = initialAvailableRooms > 1
-                                ) { Icon(Icons.Default.Remove, contentDescription = null) }
-                                Text("$initialAvailableRooms", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    onClick = { if (initialAvailableRooms > 0) initialAvailableRooms-- },
+                                    enabled = initialAvailableRooms > 0
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad")
+                                }
+                                Text(
+                                    text = "$initialAvailableRooms",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.widthIn(min = 28.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
                                 FilledTonalIconButton(
-                                    onClick = { if (initialAvailableRooms < 50) initialAvailableRooms++ },
-                                    enabled = initialAvailableRooms < 50
-                                ) { Icon(Icons.Default.Add, contentDescription = null) }
+                                    onClick = { if (initialAvailableRooms < 999) initialAvailableRooms++ },
+                                    enabled = initialAvailableRooms < 999
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Aumentar cantidad")
+                                }
                             }
                         }
                     }
+                }
+                item {
+                    CatalogImagePicker(
+                        imageUrl = imageUrl,
+                        onImageUrlChange = { imageUrl = it },
+                        onUploadImageBytes = onUploadImageBytes
+                    )
                 }
             }
         },
@@ -2542,6 +2621,7 @@ fun DialogoAgregarAlojamiento(
 @Composable
 fun DialogoAgregarAtraccion(
     onDismiss: () -> Unit,
+    onUploadImageBytes: suspend (ByteArray) -> Result<String>,
     onSave: (
         title: String,
         city: String,
@@ -2560,7 +2640,7 @@ fun DialogoAgregarAtraccion(
     var pricePerPerson by remember { mutableStateOf("50.00") }
     var description by remember { mutableStateOf("") }
     var minibusCapacity by remember { mutableIntStateOf(14) }
-    var imageUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80") }
+    var imageUrl by remember { mutableStateOf("") }
 
     val categories = listOf("Naturaleza & Aventura", "Cultural & Tours", "Gastronomía", "Playas & Deportes")
     val isFormValid = title.isNotBlank() && city.isNotBlank() && description.isNotBlank() &&
@@ -2571,7 +2651,7 @@ fun DialogoAgregarAtraccion(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text("+ Agregar Atracción", fontWeight = FontWeight.Bold)
             }
         },
@@ -2654,12 +2734,12 @@ fun DialogoAgregarAtraccion(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Text("Transporte incluido: Microbús pequeño", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                    Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text("Capacidad de la experiencia", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                 }
                                 Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
                                     Text(
-                                        text = "$minibusCapacity asientos",
+                                        text = "$minibusCapacity cupos",
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
@@ -2668,7 +2748,7 @@ fun DialogoAgregarAtraccion(
                                 }
                             }
                             Text(
-                                text = "Capacidad del microbús configurable entre 8 y 15 pasajeros (estándar: 14).",
+                                text = "Capacidad máxima de asistentes configurable entre 8 y 15 cupos.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2677,7 +2757,7 @@ fun DialogoAgregarAtraccion(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Capacidad de asientos:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                                Text("Capacidad de cupos:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilledTonalIconButton(
                                         onClick = { if (minibusCapacity > 8) minibusCapacity-- },
@@ -2692,6 +2772,13 @@ fun DialogoAgregarAtraccion(
                             }
                         }
                     }
+                }
+                item {
+                    CatalogImagePicker(
+                        imageUrl = imageUrl,
+                        onImageUrlChange = { imageUrl = it },
+                        onUploadImageBytes = onUploadImageBytes
+                    )
                 }
             }
         },
@@ -2798,85 +2885,6 @@ private fun DialogoLoginRegistro(
 }
 
 // =========================================================================
-// DIÁLOGO AÑADIR TARJETA CON AUTO-SLASH MM/AA
-// =========================================================================
-@Composable
-private fun DialogoAgregarTarjeta(
-    onDismiss: () -> Unit,
-    onAdd: (String, String, String) -> Unit
-) {
-    var cardNumber by remember { mutableStateOf("") }
-    var cardHolder by remember { mutableStateOf("") }
-    var cardExpiryDigits by remember { mutableStateOf("") } // 4 dígitos crudos
-
-    val errorCard = remember(cardNumber) {
-        if (cardNumber.isEmpty()) null else FormValidator.validateCardNumber(cardNumber).errorMessageOrNull
-    }
-
-    val formattedExpiry = remember(cardExpiryDigits) {
-        if (cardExpiryDigits.length >= 2) {
-            "${cardExpiryDigits.take(2)}/${cardExpiryDigits.drop(2)}"
-        } else cardExpiryDigits
-    }
-
-    val errorExpiry = remember(formattedExpiry) {
-        if (cardExpiryDigits.length < 4) null else FormValidator.validateCardExpiry(formattedExpiry).errorMessageOrNull
-    }
-
-    val isValid = errorCard == null && errorExpiry == null && cardNumber.isNotBlank() &&
-        cardHolder.isNotBlank() && cardExpiryDigits.length == 4
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Añadir tarjeta de pago", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ValidatedTextField(
-                    value = cardNumber,
-                    onValueChange = { if (it.length <= 19) cardNumber = it },
-                    label = "Número de tarjeta",
-                    leadingIcon = Icons.Default.CreditCard,
-                    errorText = errorCard,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
-                )
-
-                ValidatedTextField(
-                    value = cardHolder,
-                    onValueChange = { cardHolder = it },
-                    label = "Nombre del titular (como figura en la tarjeta)",
-                    leadingIcon = Icons.Default.Person,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-
-                ValidatedTextField(
-                    value = cardExpiryDigits,
-                    onValueChange = { input ->
-                        val digits = input.filter { it.isDigit() }.take(4)
-                        cardExpiryDigits = digits
-                    },
-                    label = "Vencimiento (MM/AA)",
-                    leadingIcon = Icons.Default.CalendarToday,
-                    errorText = errorExpiry,
-                    visualTransformation = CardExpiryVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onAdd(cardNumber, cardHolder, formattedExpiry) },
-                enabled = isValid
-            ) {
-                Text("Guardar tarjeta", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
-        }
-    )
-}
-
-// =========================================================================
 // 4. DETALLE DE HOTEL & SELECCIÓN DE HABITACIONES CON FOTOS ESPECÍFICAS
 // =========================================================================
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2924,15 +2932,15 @@ fun HotelDetailScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(top = 10.dp, bottom = 28.dp)
         ) {
-            // Hero Photo
+            // Hero Photo / Carousel
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxWidth().height(210.dp)) {
-                        LuminaNetworkImage(
-                            url = hotel.imageUrl,
+                        ImageCarousel(
+                            images = hotel.galleryImages.take(5),
                             contentDescription = hotel.name,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -2988,27 +2996,38 @@ fun HotelDetailScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDateRangePicker = true }
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
-                            Text("Tu estancia:", style = MaterialTheme.typography.labelSmall)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = "Tu estancia:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Text(
                                 text = "$checkIn al $checkOut ($nights ${if (nights == 1) "noche" else "noches"} • $guests adultos)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        TextButton(onClick = { showDateRangePicker = true }) {
-                            Text("Cambiar")
-                        }
+                        CambiarAccionButton(
+                            onClick = { showDateRangePicker = true },
+                            text = "Cambiar",
+                            icon = Icons.Default.EditCalendar
+                        )
                     }
                 }
             }
@@ -3136,7 +3155,6 @@ fun HotelCheckoutScreen(
     val nights by viewModel.stayNights.collectAsState()
     val guests by viewModel.guestsCount.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
-    val savedCards by viewModel.savedCards.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
     var fullName by remember { mutableStateOf(if (isLoggedIn) profile.fullName else "") }
@@ -3148,15 +3166,10 @@ fun HotelCheckoutScreen(
     var showCountryPicker by remember { mutableStateOf(false) }
 
     var specialRequests by remember { mutableStateOf("") }
-    var paymentMethod by remember { mutableStateOf(if (savedCards.isNotEmpty()) "Tarjeta ${savedCards.first().cardNumberMasked}" else "Nueva Tarjeta de Crédito") }
+    var paymentMethod by remember { mutableStateOf("PayPal / Tarjeta en Línea (PayPal Sandbox)") }
 
-    var cardNumber by remember { mutableStateOf("") }
-    var cardExpiryDigits by remember { mutableStateOf("") }
-    var cardCvv by remember { mutableStateOf("") }
-
-    val formattedExpiry = remember(cardExpiryDigits) {
-        if (cardExpiryDigits.length >= 2) "${cardExpiryDigits.take(2)}/${cardExpiryDigits.drop(2)}" else cardExpiryDigits
-    }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Validaciones
     val errorName = remember(fullName) {
@@ -3169,26 +3182,15 @@ fun HotelCheckoutScreen(
         if (phone.isEmpty()) null else FormValidator.validatePhone(phone, isRequired = true).errorMessageOrNull
     }
 
-    val isNewCard = paymentMethod.contains("Nueva Tarjeta", ignoreCase = true)
-    val errorCard = remember(cardNumber, isNewCard) {
-        if (!isNewCard || cardNumber.isEmpty()) null else FormValidator.validateCardNumber(cardNumber).errorMessageOrNull
-    }
-    val errorExpiry = remember(formattedExpiry, isNewCard) {
-        if (!isNewCard || cardExpiryDigits.length < 4) null else FormValidator.validateCardExpiry(formattedExpiry).errorMessageOrNull
-    }
-    val errorCvv = remember(cardCvv, isNewCard) {
-        if (!isNewCard || cardCvv.isEmpty()) null else FormValidator.validateCardCvv(cardCvv).errorMessageOrNull
-    }
-
     val isFormValid = errorName == null && errorEmail == null && errorPhone == null &&
-        fullName.isNotBlank() && email.isNotBlank() && phone.isNotBlank() &&
-        (!isNewCard || (errorCard == null && errorExpiry == null && errorCvv == null && cardNumber.isNotBlank() && cardExpiryDigits.length == 4 && cardCvv.isNotBlank()))
+        fullName.isNotBlank() && email.isNotBlank() && phone.isNotBlank()
 
-    val discount = if (isLoggedIn && hotel.hasGeniusDiscount) 0.90 else 1.0
-    val roomNightly = room.pricePerNight * discount
-    val subtotal = roomNightly * nights
-    val taxes = subtotal * 0.13
-    val total = subtotal + taxes
+    val rawSubtotal = room.pricePerNight * nights
+    val hasGeniusDiscount = isLoggedIn && hotel.hasGeniusDiscount
+    val discountAmount = if (hasGeniusDiscount) rawSubtotal * 0.10 else 0.0
+    val discountedSubtotal = rawSubtotal - discountAmount
+    val taxes = discountedSubtotal * 0.13
+    val total = discountedSubtotal + taxes
 
     Scaffold(
         topBar = {
@@ -3214,7 +3216,8 @@ fun HotelCheckoutScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(hotel.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -3233,36 +3236,98 @@ fun HotelCheckoutScreen(
                             }
                             Column {
                                 Text("Duración", style = MaterialTheme.typography.labelSmall)
-                                Text("$nights noches • $guests pers.", fontWeight = FontWeight.Bold)
+                                Text("$nights ${if (nights == 1) "noche" else "noches"} • $guests pers.", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
 
-            // Desglose de Precios
+            // Desglose de Precios con Descuento Real del 10% (Genius)
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Desglose del precio", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Habitación ($nights noches)")
-                            Text("US$${String.format("%.2f", subtotal)}")
-                        }
-                        if (isLoggedIn && hotel.hasGeniusDiscount) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Descuento Genius (10%)", color = Color(0xFF15803D), fontWeight = FontWeight.SemiBold)
-                                Text("-US$${String.format("%.2f", (room.pricePerNight * nights) * 0.10)}", color = Color(0xFF15803D), fontWeight = FontWeight.SemiBold)
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Resumen de Cobro", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            if (hasGeniusDiscount) {
+                                GeniusDiscountBadge(text = "10% dto. Genius aplicado")
                             }
                         }
+
+                        if (hasGeniusDiscount) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFECFDF5),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF15803D), modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "¡Beneficio Genius Nivel 1! Ahorras US$${String.format("%.2f", discountAmount)} por tener tu sesión iniciada.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF15803D),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        } else if (!isLoggedIn && hotel.hasGeniusDiscount) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "Inicia sesión para activar el 10% de descuento Genius en este alojamiento.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Habitación ($nights ${if (nights == 1) "noche" else "noches"})")
+                            Text("US$${String.format("%.2f", rawSubtotal)}")
+                        }
+
+                        if (hasGeniusDiscount) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Descuento Genius (10%)", color = Color(0xFF15803D), fontWeight = FontWeight.Bold)
+                                Text("-US$${String.format("%.2f", discountAmount)}", color = Color(0xFF15803D), fontWeight = FontWeight.Bold)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Subtotal neto", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("US$${String.format("%.2f", discountedSubtotal)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Impuestos y cargos (13% IVA)")
                             Text("US$${String.format("%.2f", taxes)}")
                         }
+
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -3349,10 +3414,7 @@ fun HotelCheckoutScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Método de pago", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
 
-                        val paymentOptions = mutableListOf<String>()
-                        savedCards.forEach { card -> paymentOptions.add("Tarjeta ${card.cardNumberMasked}") }
-                        paymentOptions.add("Nueva Tarjeta de Crédito")
-                        paymentOptions.add("Pagar en el Alojamiento")
+                        val paymentOptions = listOf("PayPal / Tarjeta en Línea (PayPal Sandbox)", "Pagar en el Alojamiento")
 
                         FilterChipRow(
                             options = paymentOptions,
@@ -3360,35 +3422,24 @@ fun HotelCheckoutScreen(
                             onOptionSelected = { paymentMethod = it }
                         )
 
-                        if (isNewCard) {
-                            ValidatedTextField(
-                                value = cardNumber,
-                                onValueChange = { if (it.length <= 19) cardNumber = it },
-                                label = "Número de tarjeta",
-                                leadingIcon = Icons.Default.CreditCard,
-                                errorText = errorCard,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ValidatedTextField(
-                                    value = cardExpiryDigits,
-                                    onValueChange = { input ->
-                                        cardExpiryDigits = input.filter { it.isDigit() }.take(4)
-                                    },
-                                    label = "Vencimiento (MM/AA)",
-                                    errorText = errorExpiry,
-                                    visualTransformation = CardExpiryVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                ValidatedTextField(
-                                    value = cardCvv,
-                                    onValueChange = { if (it.length <= 4) cardCvv = it },
-                                    label = "CVV",
-                                    errorText = errorCvv,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                                    modifier = Modifier.weight(1f)
-                                )
+                        if (paymentMethod.equals("Pagar en el Alojamiento", ignoreCase = true)) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                    Text(
+                                        text = "El pago se realiza directamente en recepción al momento del check-in en efectivo o con tarjeta física y sin cargos por adelantado.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -3400,19 +3451,45 @@ fun HotelCheckoutScreen(
                 Button(
                     onClick = {
                         val fullPhone = "${selectedCountry.dialCode} ${phone.trim()}"
-                        viewModel.confirmarReservaHotel(
-                            hotel = hotel,
-                            room = room,
-                            guestFullName = fullName,
-                            guestEmail = email,
-                            guestPhone = fullPhone,
-                            paymentMethod = paymentMethod,
-                            cardNumber = cardNumber,
-                            cardExpiry = formattedExpiry,
-                            cardCvv = cardCvv,
-                            specialRequests = specialRequests,
-                            onSuccess = onBookingSuccess
-                        )
+                        if (paymentMethod.equals("Pagar en el Alojamiento", ignoreCase = true)) {
+                            viewModel.confirmarReservaHotel(
+                                hotel = hotel,
+                                room = room,
+                                guestFullName = fullName,
+                                guestEmail = email,
+                                guestPhone = fullPhone,
+                                paymentMethod = "PAY_AT_PROPERTY",
+                                specialRequests = specialRequests.ifBlank { null },
+                                onSuccess = onBookingSuccess
+                            )
+                        } else {
+                            coroutineScope.launch {
+                                viewModel.createPayPalOrder(total).onSuccess { orderRes ->
+                                    PaymentGatewayManager.openPayPalCheckout(context, orderRes.approveUrl)
+                                    viewModel.confirmarReservaHotel(
+                                        hotel = hotel,
+                                        room = room,
+                                        guestFullName = fullName,
+                                        guestEmail = email,
+                                        guestPhone = fullPhone,
+                                        paymentMethod = "PAYPAL_EL_SALVADOR (${orderRes.orderId})",
+                                        specialRequests = specialRequests.ifBlank { null },
+                                        onSuccess = onBookingSuccess
+                                    )
+                                }.onFailure {
+                                    viewModel.confirmarReservaHotel(
+                                        hotel = hotel,
+                                        room = room,
+                                        guestFullName = fullName,
+                                        guestEmail = email,
+                                        guestPhone = fullPhone,
+                                        paymentMethod = "PAYPAL_EL_SALVADOR (Sandbox Fallback)",
+                                        specialRequests = specialRequests.ifBlank { null },
+                                        onSuccess = onBookingSuccess
+                                    )
+                                }
+                            }
+                        }
                     },
                     enabled = isFormValid,
                     shape = RoundedCornerShape(14.dp),
@@ -3420,7 +3497,7 @@ fun HotelCheckoutScreen(
                         .fillMaxWidth()
                         .height(54.dp)
                 ) {
-                    Text("Completar Reserva", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Completar Reserva con PayPal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -3570,8 +3647,8 @@ fun DialogoAtraccionDetalleYReserva(
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
-                    LuminaNetworkImage(
-                        url = attraction.imageUrl,
+                    ImageCarousel(
+                        images = attraction.galleryImages.take(5),
                         contentDescription = attraction.title,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -3591,7 +3668,7 @@ fun DialogoAtraccionDetalleYReserva(
                     }
                 }
 
-                // Información de Microbús pequeño y disponibilidad
+                // Información de capacidad y disponibilidad de la atracción
                 item {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -3605,11 +3682,11 @@ fun DialogoAtraccionDetalleYReserva(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                    Text("Microbús pequeño", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                    Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                    Text("Capacidad de la experiencia", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                                 }
                                 Text(
-                                    text = "${attraction.availableSpots} / ${attraction.minibusCapacity} spots disponibles",
+                                    text = "${attraction.availableSpots} / ${attraction.minibusCapacity} cupos disponibles",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = if (attraction.availableSpots <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
@@ -3623,7 +3700,7 @@ fun DialogoAtraccionDetalleYReserva(
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                             Text(
-                                text = "Transporte incluido con capacidad de ${attraction.minibusCapacity} pasajeros. Quedan ${attraction.availableSpots} lugares.",
+                                text = "Capacidad máxima de ${attraction.minibusCapacity} asistentes. Quedan ${attraction.availableSpots} cupos.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -3634,22 +3711,39 @@ fun DialogoAtraccionDetalleYReserva(
                 // Selector de Fecha
                 item {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true }
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("Fecha de la experiencia", style = MaterialTheme.typography.labelSmall)
-                                Text(selectedDate.toString(), fontWeight = FontWeight.Bold)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 12.dp)
+                            ) {
+                                Text(
+                                    text = "Fecha de la experiencia",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = selectedDate.toString(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                            TextButton(onClick = { showDatePicker = true }) { Text("Cambiar") }
+                            CambiarAccionButton(
+                                onClick = { showDatePicker = true },
+                                text = "Cambiar",
+                                icon = Icons.Default.CalendarToday
+                            )
                         }
                     }
                 }
@@ -3665,7 +3759,7 @@ fun DialogoAtraccionDetalleYReserva(
                         Column {
                             Text("Cantidad de entradas:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             if (maxTickets <= 0) {
-                                Text("Sin cupos en el microbús", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                Text("Sin cupos disponibles", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3779,6 +3873,8 @@ fun MyBookingsScreen(
     val hotelBookings by viewModel.customerHotelBookings.collectAsState()
     val attractionBookings by viewModel.customerAttractionBookings.collectAsState()
     val filtro by viewModel.filtroTipoItinerario.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val profile by viewModel.userProfile.collectAsState()
 
     var bookingACancelar by remember { mutableStateOf<CustomerHotelBooking?>(null) }
     var ticketACancelar by remember { mutableStateOf<CustomerAttractionBooking?>(null) }
@@ -3796,118 +3892,198 @@ fun MyBookingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp)
     ) {
-        item {
-            FilterChipRow(
-                options = listOf("Todas", "Hoteles", "Atracciones"),
-                selectedOption = filtro,
-                onOptionSelected = { viewModel.filtroTipoItinerario.value = it }
-            )
-        }
-
-        if (isEmpty) {
+        if (!isLoggedIn || profile.email.isBlank()) {
             item {
                 EmptyStateView(
-                    icon = Icons.Default.Luggage,
-                    title = "Aún no tienes viajes reservados",
-                    description = "Tus reservas de hoteles y entradas para atracciones aparecerán aquí.",
+                    icon = Icons.Default.Lock,
+                    title = "Inicia sesión para ver tus reservas",
+                    description = "Por tu privacidad y seguridad, tus reservas confirmadas e itinerarios solo son visibles cuando has iniciado sesión en tu cuenta.",
                     actionText = "Explorar Alojamientos",
                     onActionClick = onExploreStays
                 )
             }
         } else {
-            // Sección Hoteles
-            if (filtro == "Todas" || filtro == "Hoteles") {
-                items(hotelBookings, key = { it.bookingReference }) { b ->
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.Hotel, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                    Text("Estadía • Ref: ${b.bookingReference}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                }
-                                EstadoBadge(b.status)
-                            }
-                            Text(b.hotelName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(b.roomName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("Fechas: ${b.checkInDate} al ${b.checkOutDate} (${b.nights} noches • ${b.guestsCount} pers.)", style = MaterialTheme.typography.bodySmall)
-                            Text("Titular: ${b.guestFullName} • ${b.paymentMethod}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                FilterChipRow(
+                    options = listOf("Todas", "Hoteles", "Atracciones"),
+                    selectedOption = filtro,
+                    onOptionSelected = { viewModel.filtroTipoItinerario.value = it }
+                )
+            }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "US$${String.format("%.2f", b.totalPrice)}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                if (b.status == "CONFIRMADA") {
-                                    OutlinedButton(
-                                        onClick = { bookingACancelar = b },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                        shape = RoundedCornerShape(10.dp)
+            if (isEmpty) {
+                item {
+                    EmptyStateView(
+                        icon = Icons.Default.Luggage,
+                        title = "No tienes reservas registradas",
+                        description = "Tus reservas de alojamientos y entradas para atracciones aparecerán aquí ordenadas por fecha y estado.",
+                        actionText = "Explorar Alojamientos",
+                        onActionClick = onExploreStays
+                    )
+                }
+            } else {
+                // Sección Hoteles
+                if (filtro == "Todas" || filtro == "Hoteles") {
+                    items(hotelBookings, key = { it.bookingReference }) { b ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                     ) {
-                                        Text("Cancelar Reserva")
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Hotel, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            Text("Estadía • Ref: ${b.bookingReference}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    EstadoBadge(b.status)
+                                }
+
+                                Text(b.hotelName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(b.roomName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Fechas: ${b.checkInDate} al ${b.checkOutDate} (${b.nights} ${if (b.nights == 1) "noche" else "noches"} • ${b.guestsCount} pers.)", style = MaterialTheme.typography.bodySmall)
+                                Text("Titular: ${b.guestFullName} • ${b.paymentMethod}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "US$${String.format("%.2f", b.totalPrice)}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (b.status == "CONFIRMADA") {
+                                        Surface(
+                                            onClick = { bookingACancelar = b },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Color(0xFFFFF1F2),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECDD3)),
+                                            modifier = Modifier.defaultMinSize(minHeight = 36.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(15.dp),
+                                                    tint = Color(0xFFE11D48)
+                                                )
+                                                Text(
+                                                    text = "Cancelar Reserva",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFE11D48),
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Sección Atracciones
-            if (filtro == "Todas" || filtro == "Atracciones") {
-                items(attractionBookings, key = { it.ticketReference }) { a ->
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.ConfirmationNumber, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                    Text("Actividad • Ref: ${a.ticketReference}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                }
-                                EstadoBadge(a.status)
-                            }
-                            Text(a.attractionTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("Fecha de actividad: ${a.date} • ${a.ticketsCount} ${if (a.ticketsCount == 1) "boleto" else "boletos"}", style = MaterialTheme.typography.bodySmall)
-                            Text("Titular: ${a.leadGuestName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "US$${String.format("%.2f", a.totalPrice)}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                if (a.status == "CONFIRMADA") {
-                                    OutlinedButton(
-                                        onClick = { ticketACancelar = a },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                        shape = RoundedCornerShape(10.dp)
+                // Sección Atracciones
+                if (filtro == "Todas" || filtro == "Atracciones") {
+                    items(attractionBookings, key = { it.ticketReference }) { a ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                     ) {
-                                        Text("Cancelar Entrada")
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.ConfirmationNumber, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            Text("Actividad • Ref: ${a.ticketReference}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    EstadoBadge(a.status)
+                                }
+
+                                Text(a.attractionTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("Fecha de actividad: ${a.date} • ${a.ticketsCount} ${if (a.ticketsCount == 1) "boleto" else "boletos"}", style = MaterialTheme.typography.bodySmall)
+                                Text("Titular: ${a.leadGuestName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "US$${String.format("%.2f", a.totalPrice)}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (a.status == "CONFIRMADA") {
+                                        Surface(
+                                            onClick = { ticketACancelar = a },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Color(0xFFFFF1F2),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECDD3)),
+                                            modifier = Modifier.defaultMinSize(minHeight = 36.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(15.dp),
+                                                    tint = Color(0xFFE11D48)
+                                                )
+                                                Text(
+                                                    text = "Cancelar Entrada",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFE11D48),
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

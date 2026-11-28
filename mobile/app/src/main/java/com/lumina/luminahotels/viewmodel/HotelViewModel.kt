@@ -3,8 +3,9 @@ package com.lumina.luminahotels.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumina.luminahotels.data.mock.MockDataProvider
+import com.lumina.luminahotels.data.remote.PaymentGatewayManager
 import com.lumina.luminahotels.data.repository.HotelRepository
-import com.lumina.luminahotels.data.repository.HotelRepositoryImpl
+import com.lumina.luminahotels.data.repository.SupabaseHotelRepository
 import com.lumina.luminahotels.domain.validation.FormValidator
 import com.lumina.luminahotels.domain.validation.ValidationResult
 import com.lumina.luminahotels.model.*
@@ -20,7 +21,7 @@ import java.time.temporal.ChronoUnit
  * métodos de pago guardados e historial de transacciones.
  */
 class HotelViewModel(
-    private val repository: HotelRepository = HotelRepositoryImpl()
+    private val repository: HotelRepository = SupabaseHotelRepository()
 ) : ViewModel() {
 
     // Eventos UI (Snackbars, alertas)
@@ -41,8 +42,6 @@ class HotelViewModel(
     val isLoggedIn = MutableStateFlow(false)
 
     val userProfile = MutableStateFlow(UserProfile(fullName = "", email = "", phoneNumber = "", isGeniusMember = false, isAdmin = false))
-
-    val savedCards = MutableStateFlow<List<SavedPaymentCard>>(emptyList())
 
     val pastTransactions = MutableStateFlow<List<PastTransaction>>(emptyList())
 
@@ -166,9 +165,31 @@ class HotelViewModel(
     val filtroTipoItinerario = MutableStateFlow("Todas")
 
     init {
+        viewModelScope.launch {
+            repository.sincronizarConSupabase()
+        }
         cargarHoteles()
         cargarAtracciones()
         cargarReservasHuesped()
+        iniciarEscuchaRealtime()
+    }
+
+    private fun iniciarEscuchaRealtime() {
+        viewModelScope.launch {
+            try {
+                repository.observeCatalogChanges().collect {
+                    cargarHoteles()
+                    cargarAtracciones()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HotelViewModel", "Error al escuchar cambios en tiempo real", e)
+            }
+        }
+    }
+
+    suspend fun subirFotoCatalogo(bytes: ByteArray, folder: String): Result<String> {
+        val fileName = "$folder/${java.util.UUID.randomUUID()}.jpg"
+        return repository.uploadCatalogImage(bytes, fileName)
     }
 
     // =========================================================================
@@ -205,15 +226,33 @@ class HotelViewModel(
                 .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         }
 
+        val cleanEmail = FormValidator.sanitize(trimmedEmail)
         userProfile.value = UserProfile(
             fullName = name,
-            email = FormValidator.sanitize(trimmedEmail),
+            email = cleanEmail,
+            phoneNumber = "",
             isGeniusMember = true,
+            gender = "Prefiero no decirlo",
+            birthDate = "",
+            country = "El Salvador",
+            address = "",
+            passportNumber = "",
+            passportCountry = "El Salvador",
+            passportExpiryDate = "",
             isAdmin = isAdminUser
         )
         isLoggedIn.value = true
-        savedCards.value = MockDataProvider.defaultSavedCards
         pastTransactions.value = MockDataProvider.defaultPastTransactions
+
+        viewModelScope.launch {
+            repository.getPerfil(cleanEmail).onSuccess { remoteProfile ->
+                if (remoteProfile != null) {
+                    userProfile.value = remoteProfile.copy(isAdmin = isAdminUser)
+                }
+            }
+            cargarReservasHuesped()
+        }
+
         if (isAdminUser) {
             emitEvent(UiEvent.ShowSnackbar("¡Bienvenido Admin, $name! Panel Admin desbloqueado."))
         } else {
@@ -223,11 +262,25 @@ class HotelViewModel(
 
     fun cerrarSesion() {
         isLoggedIn.value = false
-        userProfile.value = UserProfile(fullName = "", email = "", phoneNumber = "", isGeniusMember = false, isAdmin = false)
-        savedCards.value = emptyList()
+        userProfile.value = UserProfile(
+            fullName = "",
+            email = "",
+            phoneNumber = "",
+            isGeniusMember = false,
+            gender = "Prefiero no decirlo",
+            birthDate = "",
+            country = "El Salvador",
+            address = "",
+            passportNumber = "",
+            passportCountry = "El Salvador",
+            passportExpiryDate = "",
+            isAdmin = false
+        )
         pastTransactions.value = emptyList()
         favoriteHotelIds.value = emptySet()
         favoriteAttractionIds.value = emptySet()
+        _customerHotelBookings.value = emptyList()
+        _customerAttractionBookings.value = emptyList()
         emitEvent(UiEvent.ShowSnackbar("Sesión cerrada. Puedes seguir explorando libremente."))
     }
 
@@ -246,11 +299,11 @@ class HotelViewModel(
     ) {
         val nameVal = FormValidator.validateName(fullName, "Nombre completo")
         val emailVal = FormValidator.validateEmail(email)
-        val phoneVal = FormValidator.validatePhone(phoneNumber, isRequired = true)
-        val addressVal = FormValidator.validateAddress(address)
-        val passportVal = FormValidator.validatePassportNumber(passportNumber)
-        val birthVal = FormValidator.validateBirthDate(birthDate)
-        val expiryVal = FormValidator.validatePassportExpiry(passportExpiryDate)
+        val phoneVal = if (phoneNumber.isNotBlank()) FormValidator.validatePhone(phoneNumber, isRequired = true) else ValidationResult.Valid
+        val addressVal = if (address.isNotBlank()) FormValidator.validateAddress(address) else ValidationResult.Valid
+        val passportVal = if (passportNumber.isNotBlank()) FormValidator.validatePassportNumber(passportNumber) else ValidationResult.Valid
+        val birthVal = if (birthDate.isNotBlank()) FormValidator.validateBirthDate(birthDate) else ValidationResult.Valid
+        val expiryVal = if (passportExpiryDate.isNotBlank()) FormValidator.validatePassportExpiry(passportExpiryDate) else ValidationResult.Valid
 
         if (!nameVal.isValid || !emailVal.isValid || !phoneVal.isValid ||
             !addressVal.isValid || !passportVal.isValid || !birthVal.isValid || !expiryVal.isValid) {
@@ -272,12 +325,12 @@ class HotelViewModel(
             dialCode = dialCode,
             phoneNumber = FormValidator.sanitize(phoneNumber),
             gender = gender,
-            birthDate = birthDate,
+            birthDate = birthDate.trim(),
             country = country,
             address = FormValidator.sanitize(address),
             passportNumber = FormValidator.sanitize(passportNumber).uppercase(),
             passportCountry = passportCountry,
-            passportExpiryDate = passportExpiryDate
+            passportExpiryDate = passportExpiryDate.trim()
         )
         userProfile.value = updated
 
@@ -311,8 +364,8 @@ class HotelViewModel(
             emitEvent(UiEvent.ShowSnackbar("El precio por noche debe ser mayor a 0.", isError = true))
             return
         }
-        if (initialAvailableRooms <= 0) {
-            emitEvent(UiEvent.ShowSnackbar("La cantidad de cuartos disponibles debe ser mayor a 0.", isError = true))
+        if (initialAvailableRooms < 0) {
+            emitEvent(UiEvent.ShowSnackbar("La cantidad disponible no puede ser negativa.", isError = true))
             return
         }
 
@@ -328,7 +381,7 @@ class HotelViewModel(
             sizeM2 = 42,
             pricePerNight = pricePerNight,
             amenities = amenities,
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80" },
+            imageUrl = imageUrl.trim(),
             freeCancellation = true,
             breakfastIncluded = true,
             backendHabitacionId = newRoomId,
@@ -349,16 +402,21 @@ class HotelViewModel(
             amenities = if (amenities.isEmpty()) listOf("Wi-Fi", "Piscina", "Desayuno") else amenities,
             pricePerNightStarting = pricePerNight,
             featuredTag = "Nuevo",
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80" },
+            imageUrl = imageUrl.trim(),
             hasGeniusDiscount = true,
             rooms = listOf(room)
         )
 
         viewModelScope.launch {
             repository.crearHotel(hotel, room)
-            cargarHoteles()
-            emitEvent(UiEvent.ShowSnackbar("¡Alojamiento '$name' agregado y guardado en base de datos!"))
-            onSuccess()
+                .onSuccess {
+                    cargarHoteles()
+                    emitEvent(UiEvent.ShowSnackbar("¡Alojamiento '$name' guardado exitosamente en Supabase!"))
+                    onSuccess()
+                }
+                .onFailure { err ->
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al guardar el alojamiento en Supabase", isError = true))
+                }
         }
     }
 
@@ -398,18 +456,23 @@ class HotelViewModel(
             duration = duration.ifBlank { "3 horas" },
             pricePerPerson = pricePerPerson,
             description = FormValidator.sanitize(description),
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80" },
-            highlights = listOf("Guía profesional", "Transporte: Microbús pequeño", "Equipamiento"),
-            inclusions = listOf("Transporte en Microbús pequeño ($minibusCapacity spots)", "Entradas incluidas"),
+            imageUrl = imageUrl.trim(),
+            highlights = listOf("Guía profesional", "Experiencia guiada", "Equipamiento"),
+            inclusions = listOf("Cupos reservados ($minibusCapacity cupos)", "Entradas incluidas"),
             minibusCapacity = minibusCapacity,
             availableSpots = minibusCapacity
         )
 
         viewModelScope.launch {
             repository.crearAtraccion(attraction)
-            cargarAtracciones()
-            emitEvent(UiEvent.ShowSnackbar("¡Atracción '$title' agregada con $minibusCapacity spots de microbús!"))
-            onSuccess()
+                .onSuccess {
+                    cargarAtracciones()
+                    emitEvent(UiEvent.ShowSnackbar("¡Atracción '$title' guardada exitosamente en Supabase!"))
+                    onSuccess()
+                }
+                .onFailure { err ->
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al guardar la atracción en Supabase", isError = true))
+                }
         }
     }
 
@@ -440,7 +503,7 @@ class HotelViewModel(
             sizeM2 = 45,
             pricePerNight = pricePerNight,
             amenities = amenities,
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80" },
+            imageUrl = imageUrl.trim(),
             freeCancellation = true,
             breakfastIncluded = true,
             backendHabitacionId = 101,
@@ -460,7 +523,7 @@ class HotelViewModel(
             amenities = if (amenities.isEmpty()) listOf("Wi-Fi", "Piscina", "Desayuno") else amenities,
             pricePerNightStarting = pricePerNight,
             featuredTag = "Destacado",
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80" },
+            imageUrl = imageUrl.trim(),
             hasGeniusDiscount = true,
             rooms = listOf(room)
         )
@@ -469,11 +532,11 @@ class HotelViewModel(
             repository.updateHotel(hotelId, hotel, room)
                 .onSuccess {
                     cargarHoteles()
-                    emitEvent(UiEvent.ShowSnackbar("Alojamiento actualizado correctamente."))
+                    emitEvent(UiEvent.ShowSnackbar("Alojamiento actualizado correctamente en Supabase."))
                     onSuccess()
                 }
                 .onFailure { err ->
-                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al actualizar alojamiento", isError = true))
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al actualizar alojamiento en Supabase", isError = true))
                 }
         }
     }
@@ -483,10 +546,10 @@ class HotelViewModel(
             repository.deleteHotel(hotelId)
                 .onSuccess {
                     cargarHoteles()
-                    emitEvent(UiEvent.ShowSnackbar("Alojamiento eliminado del catálogo."))
+                    emitEvent(UiEvent.ShowSnackbar("Alojamiento eliminado de Supabase."))
                 }
                 .onFailure { err ->
-                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al eliminar alojamiento", isError = true))
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al eliminar alojamiento en Supabase", isError = true))
                 }
         }
     }
@@ -517,9 +580,9 @@ class HotelViewModel(
             duration = duration,
             pricePerPerson = pricePerPerson,
             description = FormValidator.sanitize(description),
-            imageUrl = imageUrl.ifBlank { "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80" },
-            highlights = listOf("Guía bilingüe certificado", "Transporte: Microbús pequeño", "Seguro de viaje"),
-            inclusions = listOf("Transporte: Microbús pequeño ($minibusCapacity asientos)", "Entradas incluidas"),
+            imageUrl = imageUrl.trim(),
+            highlights = listOf("Guía bilingüe certificado", "Experiencia guiada", "Seguro de viaje"),
+            inclusions = listOf("Cupos reservados ($minibusCapacity cupos)", "Entradas incluidas"),
             minibusCapacity = minibusCapacity,
             availableSpots = minibusCapacity
         )
@@ -528,11 +591,11 @@ class HotelViewModel(
             repository.updateAttraction(attrId, attr)
                 .onSuccess {
                     cargarAtracciones()
-                    emitEvent(UiEvent.ShowSnackbar("Atracción actualizada correctamente."))
+                    emitEvent(UiEvent.ShowSnackbar("Atracción actualizada correctamente en Supabase."))
                     onSuccess()
                 }
                 .onFailure { err ->
-                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al actualizar atracción", isError = true))
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al actualizar atracción en Supabase", isError = true))
                 }
         }
     }
@@ -542,46 +605,12 @@ class HotelViewModel(
             repository.deleteAttraction(attrId)
                 .onSuccess {
                     cargarAtracciones()
-                    emitEvent(UiEvent.ShowSnackbar("Atracción eliminada del catálogo."))
+                    emitEvent(UiEvent.ShowSnackbar("Atracción eliminada de Supabase."))
                 }
                 .onFailure { err ->
-                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al eliminar atracción", isError = true))
+                    emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al eliminar atracción en Supabase", isError = true))
                 }
         }
-    }
-
-    fun agregarTarjeta(cardNumber: String, cardHolder: String, expiry: String) {
-        val cardVal = FormValidator.validateCardNumber(cardNumber)
-        val expiryVal = FormValidator.validateCardExpiry(expiry)
-
-        if (!cardVal.isValid || !expiryVal.isValid || cardHolder.isBlank()) {
-            val err = (cardVal as? ValidationResult.Invalid)?.errorMessage
-                ?: (expiryVal as? ValidationResult.Invalid)?.errorMessage
-                ?: "Ingrese el titular de la tarjeta."
-            emitEvent(UiEvent.ShowSnackbar(err, isError = true))
-            return
-        }
-
-        val cleanDigits = cardNumber.replace("[\\s-]".toRegex(), "")
-        val last4 = if (cleanDigits.length >= 4) cleanDigits.takeLast(4) else "4242"
-        val brand = if (cleanDigits.startsWith("4")) "Visa" else if (cleanDigits.startsWith("5")) "Mastercard" else "Amex"
-
-        val newCard = SavedPaymentCard(
-            id = "card-${System.currentTimeMillis()}",
-            cardNumberMasked = "•••• $last4",
-            cardHolder = cardHolder.uppercase().trim(),
-            expiry = expiry.trim(),
-            cardBrand = brand,
-            isDefault = savedCards.value.isEmpty()
-        )
-
-        savedCards.value = savedCards.value + newCard
-        emitEvent(UiEvent.ShowSnackbar("Tarjeta guardada: $brand •••• $last4"))
-    }
-
-    fun eliminarTarjeta(cardId: String) {
-        savedCards.value = savedCards.value.filterNot { it.id == cardId }
-        emitEvent(UiEvent.ShowSnackbar("Tarjeta eliminada de tus métodos de pago."))
     }
 
     // =========================================================================
@@ -666,13 +695,51 @@ class HotelViewModel(
         }
     }
 
+    private fun sortHotelBookings(list: List<CustomerHotelBooking>): List<CustomerHotelBooking> {
+        val (confirmadas, canceladas) = list.partition { it.status.equals("CONFIRMADA", ignoreCase = true) }
+        val sortedConfirmadas = confirmadas.sortedWith(
+            compareByDescending<CustomerHotelBooking> { it.createdAt }
+                .thenByDescending { it.checkInDate }
+                .thenByDescending { it.bookingReference }
+        )
+        val sortedCanceladas = canceladas.sortedWith(
+            compareByDescending<CustomerHotelBooking> { it.createdAt }
+                .thenByDescending { it.checkInDate }
+                .thenByDescending { it.bookingReference }
+        )
+        return sortedConfirmadas + sortedCanceladas
+    }
+
+    private fun sortAttractionBookings(list: List<CustomerAttractionBooking>): List<CustomerAttractionBooking> {
+        val (confirmadas, canceladas) = list.partition { it.status.equals("CONFIRMADA", ignoreCase = true) }
+        val sortedConfirmadas = confirmadas.sortedWith(
+            compareByDescending<CustomerAttractionBooking> { it.createdAt }
+                .thenByDescending { it.date }
+                .thenByDescending { it.ticketReference }
+        )
+        val sortedCanceladas = canceladas.sortedWith(
+            compareByDescending<CustomerAttractionBooking> { it.createdAt }
+                .thenByDescending { it.date }
+                .thenByDescending { it.ticketReference }
+        )
+        return sortedConfirmadas + sortedCanceladas
+    }
+
     fun cargarReservasHuesped() {
+        val currentEmail = userProfile.value.email.trim()
+        if (!isLoggedIn.value || currentEmail.isBlank()) {
+            _customerHotelBookings.value = emptyList()
+            _customerAttractionBookings.value = emptyList()
+            return
+        }
         viewModelScope.launch {
-            repository.getCustomerHotelBookings().onSuccess {
-                _customerHotelBookings.value = it
+            repository.getCustomerHotelBookings(currentEmail).onSuccess { list ->
+                val strictlyMine = list.filter { it.guestEmail.trim().equals(currentEmail, ignoreCase = true) }
+                _customerHotelBookings.value = sortHotelBookings(strictlyMine)
             }
-            repository.getCustomerAttractionBookings().onSuccess {
-                _customerAttractionBookings.value = it
+            repository.getCustomerAttractionBookings(currentEmail).onSuccess { list ->
+                val strictlyMine = list.filter { it.leadGuestEmail.trim().equals(currentEmail, ignoreCase = true) }
+                _customerAttractionBookings.value = sortAttractionBookings(strictlyMine)
             }
         }
     }
@@ -684,6 +751,10 @@ class HotelViewModel(
         selectedRoomForCheckout.value = hotel to room
     }
 
+    suspend fun createPayPalOrder(amountInUsd: Double): Result<PaymentGatewayManager.PayPalOrderResponse> {
+        return PaymentGatewayManager.createPayPalOrder(amountInUsd)
+    }
+
     fun confirmarReservaHotel(
         hotel: Hotel,
         room: HotelRoom,
@@ -691,9 +762,6 @@ class HotelViewModel(
         guestEmail: String,
         guestPhone: String,
         paymentMethod: String,
-        cardNumber: String,
-        cardExpiry: String,
-        cardCvv: String,
         specialRequests: String?,
         onSuccess: () -> Unit
     ) {
@@ -710,28 +778,18 @@ class HotelViewModel(
             return
         }
 
-        if (paymentMethod.contains("Tarjeta", ignoreCase = true) && !paymentMethod.contains("••••")) {
-            val cardVal = FormValidator.validateCardNumber(cardNumber)
-            val expiryVal = FormValidator.validateCardExpiry(cardExpiry)
-            val cvvVal = FormValidator.validateCardCvv(cardCvv)
-
-            if (!cardVal.isValid || !expiryVal.isValid || !cvvVal.isValid) {
-                val err = (cardVal as? ValidationResult.Invalid)?.errorMessage
-                    ?: (expiryVal as? ValidationResult.Invalid)?.errorMessage
-                    ?: (cvvVal as? ValidationResult.Invalid)?.errorMessage
-                    ?: "Revise los datos de la tarjeta de pago."
-                emitEvent(UiEvent.ShowSnackbar(err, isError = true))
-                return
-            }
-        }
-
         val nights = stayNights.value
-        val discountMultiplier = if (isLoggedIn.value && hotel.hasGeniusDiscount) 0.90 else 1.0
-        val subtotal = (nights * room.pricePerNight) * discountMultiplier
+        val hasGeniusDiscount = isLoggedIn.value && hotel.hasGeniusDiscount
+        val rawSubtotal = nights * room.pricePerNight
+        val discountAmount = if (hasGeniusDiscount) rawSubtotal * 0.10 else 0.0
+        val subtotal = rawSubtotal - discountAmount
         val taxes = subtotal * 0.13 // 13% IVA
         val total = subtotal + taxes
 
         val bookingReference = "LUM-${(10000..99999).random()}"
+        val sanitizedEmail = FormValidator.sanitize(guestEmail).trim().lowercase()
+        val sanitizedName = FormValidator.sanitize(guestFullName)
+        val sanitizedPhone = FormValidator.sanitize(guestPhone)
 
         val newBooking = CustomerHotelBooking(
             bookingReference = bookingReference,
@@ -739,9 +797,9 @@ class HotelViewModel(
             hotelName = hotel.name,
             hotelCity = hotel.city,
             roomName = room.name,
-            guestFullName = FormValidator.sanitize(guestFullName),
-            guestEmail = FormValidator.sanitize(guestEmail),
-            guestPhone = FormValidator.sanitize(guestPhone),
+            guestFullName = sanitizedName,
+            guestEmail = sanitizedEmail,
+            guestPhone = sanitizedPhone,
             checkInDate = checkInDate.value.toString(),
             checkOutDate = checkOutDate.value.toString(),
             nights = nights,
@@ -750,13 +808,21 @@ class HotelViewModel(
             taxesAndFees = taxes,
             totalPrice = total,
             paymentMethod = paymentMethod,
-            specialRequests = specialRequests?.ifBlank { null }
+            specialRequests = specialRequests?.ifBlank { null },
+            discountAmount = discountAmount,
+            originalSubtotal = rawSubtotal
         )
 
         viewModelScope.launch {
             repository.bookHotel(newBooking).onSuccess { confirmed ->
                 recentHotelBookingConfirmed.value = confirmed
-                cargarReservasHuesped()
+
+                if (!isLoggedIn.value && sanitizedEmail.isNotBlank()) {
+                    iniciarSesion(sanitizedEmail, sanitizedName)
+                } else {
+                    _customerHotelBookings.value = sortHotelBookings(listOf(confirmed) + _customerHotelBookings.value.filter { it.bookingReference != confirmed.bookingReference })
+                    cargarReservasHuesped()
+                }
 
                 // Registrar en transacciones pasadas
                 val newTx = PastTransaction(
@@ -774,7 +840,8 @@ class HotelViewModel(
                 emitEvent(UiEvent.ShowSnackbar("¡Reserva confirmada con éxito! Referencia: ${confirmed.bookingReference}"))
                 onSuccess()
             }.onFailure { err ->
-                emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al procesar la reserva", isError = true))
+                val errorMsg = err.localizedMessage ?: err.message ?: "Error al procesar la reserva"
+                emitEvent(UiEvent.ShowSnackbar(errorMsg, isError = true))
             }
         }
     }
@@ -804,6 +871,9 @@ class HotelViewModel(
 
         val total = ticketsCount * attraction.pricePerPerson
         val ticketRef = "ATR-${(10000..99999).random()}"
+        val sanitizedEmail = FormValidator.sanitize(leadGuestEmail).trim().lowercase()
+        val sanitizedName = FormValidator.sanitize(leadGuestName)
+        val sanitizedPhone = FormValidator.sanitize(leadGuestPhone)
 
         val booking = CustomerAttractionBooking(
             ticketReference = ticketRef,
@@ -812,9 +882,9 @@ class HotelViewModel(
             city = attraction.city,
             date = date.toString(),
             ticketsCount = ticketsCount,
-            leadGuestName = FormValidator.sanitize(leadGuestName),
-            leadGuestEmail = FormValidator.sanitize(leadGuestEmail),
-            leadGuestPhone = FormValidator.sanitize(leadGuestPhone),
+            leadGuestName = sanitizedName,
+            leadGuestEmail = sanitizedEmail,
+            leadGuestPhone = sanitizedPhone,
             totalPrice = total,
             paymentMethod = paymentMethod
         )
@@ -822,7 +892,13 @@ class HotelViewModel(
         viewModelScope.launch {
             repository.bookAttraction(booking).onSuccess { confirmed ->
                 recentAttractionBookingConfirmed.value = confirmed
-                cargarReservasHuesped()
+
+                if (!isLoggedIn.value && sanitizedEmail.isNotBlank()) {
+                    iniciarSesion(sanitizedEmail, sanitizedName)
+                } else {
+                    _customerAttractionBookings.value = sortAttractionBookings(listOf(confirmed) + _customerAttractionBookings.value.filter { it.ticketReference != confirmed.ticketReference })
+                    cargarReservasHuesped()
+                }
 
                 // Registrar en transacciones pasadas
                 val newTx = PastTransaction(
@@ -837,10 +913,11 @@ class HotelViewModel(
                 )
                 pastTransactions.value = listOf(newTx) + pastTransactions.value
 
-                emitEvent(UiEvent.ShowSnackbar("¡Entradas confirmadas! Referencia: ${confirmed.ticketReference}"))
+                emitEvent(UiEvent.ShowSnackbar("¡Entrada confirmada! Ref: ${confirmed.ticketReference}"))
                 onSuccess()
             }.onFailure { err ->
-                emitEvent(UiEvent.ShowSnackbar(err.message ?: "Error al reservar entradas", isError = true))
+                val errorMsg = err.localizedMessage ?: err.message ?: "Error al reservar actividad"
+                emitEvent(UiEvent.ShowSnackbar(errorMsg, isError = true))
             }
         }
     }

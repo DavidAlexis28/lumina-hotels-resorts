@@ -383,11 +383,11 @@ object FormValidator {
     }
 
     /**
-     * Valida la capacidad de microbús pequeño para atracciones turísticas (entre 8 y 15 pasajeros).
+     * Valida la capacidad de cupos para atracciones turísticas (entre 8 y 15 cupos).
      */
     fun validateMinibusCapacity(capacity: Int): ValidationResult {
         if (capacity < 8 || capacity > 15) {
-            return ValidationResult.Invalid("La capacidad del microbús debe estar entre 8 y 15 pasajeros.")
+            return ValidationResult.Invalid("La capacidad debe estar entre 8 y 15 cupos.")
         }
         return ValidationResult.Valid
     }

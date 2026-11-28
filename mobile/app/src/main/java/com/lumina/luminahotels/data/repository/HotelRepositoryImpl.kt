@@ -1,19 +1,19 @@
 package com.lumina.luminahotels.data.repository
 
-import com.lumina.luminahotels.data.mock.MockDataProvider
 import com.lumina.luminahotels.data.remote.LuminaApiService
 import com.lumina.luminahotels.data.remote.RetrofitClient
 import com.lumina.luminahotels.model.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
- * Implementación de producción para HotelRepository.
- * Proporciona soporte completo para la experiencia de reserva de huéspedes (B2C)
- * y sincronización con el backend REST cuando está disponible.
+ * Implementación en memoria / Retrofit para HotelRepository.
+ * Base de datos como única fuente de verdad (estrictamente vacía por defecto).
  */
 class HotelRepositoryImpl(
     private val api: LuminaApiService = RetrofitClient.api
@@ -22,27 +22,29 @@ class HotelRepositoryImpl(
     private val _modoOfflineActivo = MutableStateFlow(false)
     override val modoOfflineActivo: StateFlow<Boolean> = _modoOfflineActivo.asStateFlow()
 
-    // Datos B2C en memoria
-    private val hotelsList = MockDataProvider.defaultHotels.toMutableList()
-    private val attractionsList = MockDataProvider.defaultAttractions.toMutableList()
-    private val customerHotelBookings = MockDataProvider.sampleBookings.toMutableList()
-    private val customerAttractionBookings = MockDataProvider.sampleAttractionBookings.toMutableList()
+    // Datos B2C en memoria (estrictamente vacíos, Supabase como única fuente de verdad)
+    private val hotelsList = mutableListOf<Hotel>()
+    private val attractionsList = mutableListOf<TouristAttraction>()
+    private val customerHotelBookings = mutableListOf<CustomerHotelBooking>()
+    private val customerAttractionBookings = mutableListOf<CustomerAttractionBooking>()
 
     // Catálogo base de habitaciones para sincronización técnica
-    private val localHabitaciones = mutableListOf(
-        HabitacionDto(1, "101", 1, "DISPONIBLE", 1, "Estándar Queen", 2, 115.0),
-        HabitacionDto(2, "102", 1, "DISPONIBLE", 1, "Estándar Queen", 2, 115.0),
-        HabitacionDto(3, "201", 2, "DISPONIBLE", 2, "Doble Superior", 4, 175.0),
-        HabitacionDto(4, "202", 2, "MANTENIMIENTO", 2, "Doble Superior", 4, 175.0),
-        HabitacionDto(5, "301", 3, "DISPONIBLE", 3, "Suite Presidencial", 4, 310.0),
-        HabitacionDto(6, "302", 3, "DISPONIBLE", 3, "Suite Presidencial", 4, 310.0)
-    )
-
+    private val localHabitaciones = mutableListOf<HabitacionDto>()
     private val localReservas = mutableListOf<ReservaDetalleDto>()
+
+    override suspend fun uploadCatalogImage(bytes: ByteArray, path: String): Result<String> = Result.success("")
+    override suspend fun deleteCatalogImage(path: String): Result<Unit> = Result.success(Unit)
+    override suspend fun createPaymentIntent(amount: Long, currency: String): Result<String> = Result.success("pi_mock_${System.currentTimeMillis()}_secret_mock")
+    override fun observeCatalogChanges(): Flow<Unit> = emptyFlow()
+
+    override suspend fun sincronizarConSupabase(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun getPerfil(correo: String): Result<UserProfile?> = Result.success(null)
 
     // =========================================================================
     // MÉTODOS B2C (CUSTOMER-FACING)
     // =========================================================================
+
 
     override suspend fun getHotels(): Result<List<Hotel>> {
         try {
@@ -91,12 +93,22 @@ class HotelRepositoryImpl(
         return Result.success(attractionsList.toList())
     }
 
-    override suspend fun getCustomerHotelBookings(): Result<List<CustomerHotelBooking>> {
-        return Result.success(customerHotelBookings.toList())
+    override suspend fun getCustomerHotelBookings(userEmail: String?): Result<List<CustomerHotelBooking>> {
+        val filtered = if (userEmail.isNullOrBlank()) {
+            emptyList()
+        } else {
+            customerHotelBookings.filter { it.guestEmail.trim().equals(userEmail.trim(), ignoreCase = true) }
+        }
+        return Result.success(filtered)
     }
 
-    override suspend fun getCustomerAttractionBookings(): Result<List<CustomerAttractionBooking>> {
-        return Result.success(customerAttractionBookings.toList())
+    override suspend fun getCustomerAttractionBookings(userEmail: String?): Result<List<CustomerAttractionBooking>> {
+        val filtered = if (userEmail.isNullOrBlank()) {
+            emptyList()
+        } else {
+            customerAttractionBookings.filter { it.leadGuestEmail.trim().equals(userEmail.trim(), ignoreCase = true) }
+        }
+        return Result.success(filtered)
     }
 
     override suspend fun bookHotel(booking: CustomerHotelBooking): Result<CustomerHotelBooking> {

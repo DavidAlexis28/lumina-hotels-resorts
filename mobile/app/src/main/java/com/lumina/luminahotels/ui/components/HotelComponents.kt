@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -79,7 +81,8 @@ class CardExpiryVisualTransformation : VisualTransformation {
 }
 
 /**
- * Renderizador de imágenes con Coil optimizado con shimmer/gradiente de carga y fallback elegante.
+ * Renderizador de imágenes con Coil optimizado con shimmer de carga y placeholder neutro elegante.
+ * Si no hay foto registrada, muestra un diseño neutro sin imágenes mock.
  */
 @Composable
 fun LuminaNetworkImage(
@@ -88,55 +91,134 @@ fun LuminaNetworkImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
-    SubcomposeAsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(url.ifBlank { "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80" })
-            .crossfade(true)
-            .build(),
-        contentDescription = contentDescription,
-        contentScale = contentScale,
-        modifier = modifier,
-        loading = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-        error = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(NavyDeep, NavyLight)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+    if (url.isBlank()) {
+        Box(
+            modifier = modifier
+                .background(
+                    Brush.linearGradient(
+                        listOf(NavyDeep, NavyLight)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Hotel,
-                    contentDescription = null,
-                    tint = GoldAccent.copy(alpha = 0.8f),
+                    imageVector = Icons.Default.Image,
+                    contentDescription = contentDescription,
+                    tint = GoldAccent.copy(alpha = 0.7f),
                     modifier = Modifier.size(36.dp)
+                )
+                Text(
+                    text = "LUMINA",
+                    color = GoldAccent.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
-    )
+    } else {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier,
+            loading = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            error = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(NavyDeep, NavyLight)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null,
+                        tint = GoldAccent.copy(alpha = 0.7f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Carrusel interactivo de fotos (1 a 5 imágenes) con indicador de página (ej. 1 / 5).
+ */
+@Composable
+fun ImageCarousel(
+    images: List<String>,
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    val pagerState = rememberPagerState(pageCount = { images.size.coerceAtLeast(1) })
+    Box(modifier = modifier) {
+        if (images.isEmpty()) {
+            LuminaNetworkImage(
+                url = "",
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                LuminaNetworkImage(
+                    url = images[page],
+                    contentDescription = contentDescription,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            if (images.size > 1) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${images.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -807,32 +889,85 @@ fun CountrySelectorButton(
 }
 
 /**
- * Insignia visual (Badge) que refleja el estado de habitaciones y reservas.
+ * Insignia visual (Badge) que refleja el estado de habitaciones y reservas con diseño moderno y accesible.
  */
 @Composable
 fun EstadoBadge(estado: String, modifier: Modifier = Modifier) {
-    val (bg, fg) = when (estado.uppercase()) {
-        "DISPONIBLE", "CONFIRMADA", "COMPLETADA" -> DisponibleBg to DisponibleText
-        "PENDIENTE", "MANTENIMIENTO" -> PendienteBg to PendienteText
-        "CANCELADA" -> Color(0xFFFFEBEE) to Color(0xFFC62828)
-        else -> OcupadaBg to OcupadaText
+    val (bg, border, fg) = when (estado.uppercase()) {
+        "DISPONIBLE" -> Triple(Color(0xFFE0F2F1), Color(0xFF80CBC4), Color(0xFF004D40))
+        "CONFIRMADA", "COMPLETADA" -> Triple(Color(0xFFE8F5E9), Color(0xFFA5D6A7), Color(0xFF1B5E20))
+        "PENDIENTE", "MANTENIMIENTO" -> Triple(Color(0xFFFFF8E1), Color(0xFFFFE082), Color(0xFFE65100))
+        "CANCELADA" -> Triple(Color(0xFFFBE9E7), Color(0xFFFFCCBC), Color(0xFFBF360C))
+        else -> Triple(Color(0xFFECEFF1), Color(0xFFCFD8DC), Color(0xFF37474F))
     }
-    Box(
-        modifier = modifier
-            .wrapContentWidth()
-            .clip(RoundedCornerShape(50))
-            .background(bg)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = bg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, border),
+        modifier = modifier.wrapContentWidth()
     ) {
-        Text(
-            text = estado.uppercase(),
-            color = fg,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(fg)
+            )
+            Text(
+                text = estado.uppercase(),
+                color = fg,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip
+            )
+        }
+    }
+}
+
+/**
+ * Botón / Chip táctil horizontal unificado para la acción "Cambiar" (estancia, fechas, huéspedes).
+ * Garantiza despliegue en una sola línea horizontal sin cortes ni saltos verticales.
+ */
+@Composable
+fun CambiarAccionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    text: String = "Cambiar",
+    icon: ImageVector = Icons.Default.EditCalendar
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+        modifier = modifier.defaultMinSize(minHeight = 36.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
     }
 }
 

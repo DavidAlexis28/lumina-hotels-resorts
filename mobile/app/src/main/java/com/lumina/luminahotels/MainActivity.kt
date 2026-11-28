@@ -101,7 +101,10 @@ fun LuminaCustomerAppRoot(hotelViewModel: HotelViewModel = viewModel()) {
             room = room,
             viewModel = hotelViewModel,
             onBack = { hotelViewModel.selectedRoomForCheckout.value = null },
-            onBookingSuccess = { hotelViewModel.selectedRoomForCheckout.value = null }
+            onBookingSuccess = {
+                hotelViewModel.selectedRoomForCheckout.value = null
+                hotelViewModel.selectedHotelForDetails.value = null
+            }
         )
         return
     }
@@ -128,7 +131,7 @@ fun LuminaCustomerAppRoot(hotelViewModel: HotelViewModel = viewModel()) {
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "LUMINA TRAVEL",
+                            text = "LUMINA HOTELS",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
@@ -152,53 +155,73 @@ fun LuminaCustomerAppRoot(hotelViewModel: HotelViewModel = viewModel()) {
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
-                // Tab 1: Buscar
-                NavigationBarItem(
-                    selected = tabActual == 0,
-                    onClick = { tabActual = 0 },
-                    icon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                    label = { Text("Buscar", fontWeight = if (tabActual == 0) FontWeight.Bold else FontWeight.Normal) }
-                )
+            Surface(
+                shadowElevation = 10.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp
+                ) {
+                    val navItemColors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-                // Tab 2: Favoritos
-                NavigationBarItem(
-                    selected = tabActual == 1,
-                    onClick = { tabActual = 1 },
-                    icon = {
-                        Icon(
-                            imageVector = if (tabActual == 1) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favoritos"
-                        )
-                    },
-                    label = { Text("Favoritos", fontWeight = if (tabActual == 1) FontWeight.Bold else FontWeight.Normal) }
-                )
+                    // Tab 1: Buscar
+                    NavigationBarItem(
+                        selected = tabActual == 0,
+                        onClick = { tabActual = 0 },
+                        icon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                        label = { Text("Buscar", fontWeight = if (tabActual == 0) FontWeight.Bold else FontWeight.Normal) },
+                        colors = navItemColors
+                    )
 
-                // Tab 3: Reservas
-                NavigationBarItem(
-                    selected = tabActual == 2,
-                    onClick = { tabActual = 2 },
-                    icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = "Reservas") },
-                    label = { Text("Reservas", fontWeight = if (tabActual == 2) FontWeight.Bold else FontWeight.Normal) }
-                )
+                    // Tab 2: Favoritos
+                    NavigationBarItem(
+                        selected = tabActual == 1,
+                        onClick = { tabActual = 1 },
+                        icon = {
+                            Icon(
+                                imageVector = if (tabActual == 1) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Favoritos"
+                            )
+                        },
+                        label = { Text("Favoritos", fontWeight = if (tabActual == 1) FontWeight.Bold else FontWeight.Normal) },
+                        colors = navItemColors
+                    )
 
-                // Tab 4 Dinámica: "Mi cuenta" (logged-in) vs. "Iniciar sesión" (logged-out)
-                NavigationBarItem(
-                    selected = tabActual == 3,
-                    onClick = { tabActual = 3 },
-                    icon = {
-                        Icon(
-                            imageVector = if (isLoggedIn) Icons.Default.AccountCircle else Icons.Default.Person,
-                            contentDescription = if (isLoggedIn) "Mi cuenta" else "Iniciar sesión"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = if (isLoggedIn) "Mi cuenta" else "Iniciar sesión",
-                            fontWeight = if (tabActual == 3) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
+                    // Tab 3: Reservas
+                    NavigationBarItem(
+                        selected = tabActual == 2,
+                        onClick = { tabActual = 2 },
+                        icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = "Reservas") },
+                        label = { Text("Reservas", fontWeight = if (tabActual == 2) FontWeight.Bold else FontWeight.Normal) },
+                        colors = navItemColors
+                    )
+
+                    // Tab 4 Dinámica: "Mi cuenta" (logged-in) vs. "Iniciar sesión" (logged-out)
+                    NavigationBarItem(
+                        selected = tabActual == 3,
+                        onClick = { tabActual = 3 },
+                        icon = {
+                            Icon(
+                                imageVector = if (isLoggedIn) Icons.Default.AccountCircle else Icons.Default.Person,
+                                contentDescription = if (isLoggedIn) "Mi cuenta" else "Iniciar sesión"
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = if (isLoggedIn) "Mi cuenta" else "Iniciar sesión",
+                                fontWeight = if (tabActual == 3) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        colors = navItemColors
+                    )
+                }
             }
         }
     ) { innerPadding ->
